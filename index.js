@@ -3,13 +3,32 @@ const app = express();
 
 app.use(express.json());
 
+// ===== BASE DE DATOS (SQLite) =====
+const sqlite3 = require("sqlite3").verbose();
+const db = new sqlite3.Database("data.db");
+
+db.run(`
+CREATE TABLE IF NOT EXISTS sensores (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    device TEXT,
+    nox INTEGER,
+    o3 INTEGER,
+    co INTEGER,
+    co2 INTEGER,
+    so2 INTEGER,
+    pm25 INTEGER,
+    pm10 INTEGER,
+    time TEXT
+)
+`);
+
+// ===== ENDPOINT SIGFOX =====
 app.post("/sigfox", (req, res) => {
     console.log("Mensaje recibido:");
     console.log(req.body);
 
     const hex = req.body.data;
 
-    // Validación básica
     if (!hex) {
         console.log("No hay data");
         return res.status(400).send("No data");
@@ -20,13 +39,39 @@ app.post("/sigfox", (req, res) => {
     console.log("Decodificado:");
     console.log(decoded);
 
+    // Guardar en BD
+    db.run(`
+    INSERT INTO sensores (device, nox, o3, co, co2, so2, pm25, pm10, time)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `, [
+        req.body.device,
+        decoded.NOx,
+        decoded.O3,
+        decoded.CO,
+        decoded.CO2,
+        decoded.SO2,
+        decoded.PM25,
+        decoded.PM10,
+        req.body.time
+    ]);
+
     res.status(200).send("OK");
 });
 
+// ===== VER DATOS =====
+app.get("/datos", (req, res) => {
+    db.all("SELECT * FROM sensores", (err, rows) => {
+        if (err) {
+            return res.status(500).send(err);
+        }
+        res.json(rows);
+    });
+});
+
+// ===== DECODIFICACIÓN =====
 function decodePayload(hex) {
     const buffer = Buffer.from(hex, "hex");
 
-    // Convertir a número grande
     let value = 0n;
     for (let byte of buffer) {
         value = (value << 8n) | BigInt(byte);
@@ -43,6 +88,9 @@ function decodePayload(hex) {
     };
 }
 
-app.listen(3000, () => {
-    console.log("Servidor corriendo en http://localhost:3000");
+// ===== PUERTO (IMPORTANTE PARA LA NUBE) =====
+const PORT = process.env.PORT || 3000;
+
+app.listen(PORT, () => {
+    console.log("Servidor corriendo en puerto " + PORT);
 });
