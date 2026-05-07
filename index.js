@@ -3,13 +3,11 @@ const sqlite3 = require("sqlite3").verbose();
 
 const app = express();
 
+// ===== MIDDLEWARES =====
 app.use(express.json());
 app.use(express.static("public"));
 
-// ===============================
-// BASE DE DATOS
-// ===============================
-
+// ===== BASE DE DATOS =====
 const db = new sqlite3.Database("data.db");
 
 db.run(`
@@ -28,10 +26,87 @@ CREATE TABLE IF NOT EXISTS sensores (
 )
 `);
 
-// ===============================
-// DECODIFICAR PAYLOAD
-// ===============================
+// ===== ENDPOINT SIGFOX =====
+app.post("/sigfox", (req, res) => {
 
+    console.log("Mensaje recibido:");
+    console.log(req.body);
+
+    const hex = req.body.data;
+
+    if (!hex) {
+        return res.status(400).send("No data");
+    }
+
+    const decoded = decodePayload(hex);
+
+    console.log("Decodificado:");
+    console.log(decoded);
+
+    // ===== GUARDAR EN BASE DE DATOS =====
+    db.run(`
+    INSERT INTO sensores (
+        device,
+        nox,
+        ozono,
+        co2,
+        co,
+        so2,
+        pm25,
+        pm10,
+        temperatura,
+        time
+    )
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `, [
+        req.body.device,
+        decoded.NOx,
+        decoded.Ozono,
+        decoded.CO2,
+        decoded.CO,
+        decoded.SO2,
+        decoded.PM25,
+        decoded.PM10,
+        decoded.Temperatura,
+        req.body.time
+    ]);
+
+    res.status(200).send("OK");
+});
+
+// ===== VER TODOS LOS DATOS =====
+app.get("/datos", (req, res) => {
+
+    db.all("SELECT * FROM sensores ORDER BY id ASC", (err, rows) => {
+
+        if (err) {
+            return res.status(500).send(err);
+        }
+
+        res.json(rows);
+    });
+
+});
+
+// ===== VER DATOS POR DISPOSITIVO =====
+app.get("/datos/:device", (req, res) => {
+
+    db.all(
+        "SELECT * FROM sensores WHERE device = ? ORDER BY id ASC",
+        [req.params.device],
+        (err, rows) => {
+
+            if (err) {
+                return res.status(500).send(err);
+            }
+
+            res.json(rows);
+        }
+    );
+
+});
+
+// ===== DECODIFICAR PAYLOAD =====
 function decodePayload(hex) {
 
     const payload = Buffer.from(hex, "hex");
@@ -64,90 +139,7 @@ function decodePayload(hex) {
     };
 }
 
-// ===============================
-// ENDPOINT SIGFOX
-// ===============================
-
-app.post("/sigfox", (req, res) => {
-
-    console.log("Mensaje recibido:");
-    console.log(req.body);
-
-    const hex = req.body.data;
-
-    if (!hex) {
-        console.log("No hay data");
-        return res.status(400).send("No data");
-    }
-
-    const decoded = decodePayload(hex);
-
-    console.log("Decodificado:");
-    console.log(decoded);
-
-    // GUARDAR EN BASE DE DATOS
-
-    db.run(`
-    INSERT INTO sensores (
-        device,
-        nox,
-        ozono,
-        co2,
-        co,
-        so2,
-        pm25,
-        pm10,
-        temperatura,
-        time
-    )
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `, [
-        req.body.device,
-        decoded.NOx,
-        decoded.Ozono,
-        decoded.CO2,
-        decoded.CO,
-        decoded.SO2,
-        decoded.PM25,
-        decoded.PM10,
-        decoded.Temperatura,
-        req.body.time
-    ]);
-
-    res.status(200).send("OK");
-});
-
-// ===============================
-// VER DATOS
-// ===============================
-
-app.get("/datos", (req, res) => {
-
-    db.all("SELECT * FROM sensores", (err, rows) => {
-
-        if (err) {
-            console.log(err);
-            return res.status(500).send(err);
-        }
-
-        res.json(rows);
-
-    });
-
-});
-
-// ===============================
-// PAGINA PRINCIPAL
-// ===============================
-
-app.get("/", (req, res) => {
-    res.send("Servidor Sigfox funcionando");
-});
-
-// ===============================
-// INICIAR SERVIDOR
-// ===============================
-
+// ===== INICIAR SERVIDOR =====
 const PORT = process.env.PORT || 3000;
 
 app.listen(PORT, () => {
