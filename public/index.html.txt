@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard Sigfox</title>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <style>
+        body {
+            font-family: Arial;
+            background: #f5f5f5;
+            margin: 20px;
+        }
+
+        h1 {
+            text-align: center;
+        }
+
+        .cards {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin-bottom: 30px;
+        }
+
+        .card {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0px 2px 5px rgba(0,0,0,0.2);
+            text-align: center;
+        }
+
+        .valor {
+            font-size: 30px;
+            font-weight: bold;
+        }
+
+        canvas {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+        }
+    </style>
+</head>
+
+<body>
+
+    <h1>Dashboard Sigfox</h1>
+
+    <div class="cards">
+
+        <div class="card">
+            <h2>CO2</h2>
+            <div class="valor" id="co2">--</div>
+        </div>
+
+        <div class="card">
+            <h2>Temperatura</h2>
+            <div class="valor" id="temp">--</div>
+        </div>
+
+        <div class="card">
+            <h2>PM2.5</h2>
+            <div class="valor" id="pm25">--</div>
+        </div>
+
+    </div>
+
+    <canvas id="grafica"></canvas>
+
+<script>
+
+let chart;
+
+async function cargarDatos() {
+
+    const respuesta = await fetch('/datos');
+    const datos = await respuesta.json();
+
+    if(datos.length === 0) return;
+
+    const ultimo = datos[datos.length - 1];
+
+    document.getElementById('co2').innerText = ultimo.co2;
+    document.getElementById('temp').innerText = ultimo.temperatura + " °C";
+    document.getElementById('pm25').innerText = ultimo.pm25;
+
+    const labels = datos.map(d => new Date(d.time * 1000).toLocaleTimeString());
+
+    const co2 = datos.map(d => d.co2);
+
+    if(chart) {
+        chart.destroy();
+    }
+
+    chart = new Chart(document.getElementById('grafica'), {
+        type: 'line',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: 'CO2',
+                data: co2
+            }]
+        }
+    });
+}
+
+cargarDatos();
+
+setInterval(cargarDatos, 10000);
+
+</script>
+
+</body>
+</html>
