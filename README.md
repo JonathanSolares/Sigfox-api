@@ -75,14 +75,14 @@ device={device}&time={time}&data={data}&seqNumber={seqNumber}
 ```text
 GET /api/stations
 GET /api/stations/:stationId/readings?days=1
-GET /api/stations/:stationId/export.xls?days=30
-GET /api/export.xls?days=30
+GET /api/stations/:stationId/export.xlsx?days=30
+GET /api/export.xlsx?days=30
 GET /api/health
 ```
 
 La web vive en `public/`, consulta `/api/stations` para los datos actuales y
 `/api/stations/:stationId/readings?days=1` para graficar las últimas 24 horas.
-También ofrece descarga Excel de la estación seleccionada o de todas las
+También ofrece descarga Excel `.xlsx` de la estación seleccionada o de todas las
 estaciones de los últimos 30 días.
 
 Si frontend y backend están en el mismo dominio, deja `public/config.js` con:
@@ -108,8 +108,6 @@ Para payload hexadecimal largo, el orden asumido es:
 | 6-7 | NOx | entero / 10 |
 | 8-9 | Ozono | entero / 10 |
 | 10-11 | Temperatura | entero con signo / 10 |
-| 12-13 | Humedad opcional | entero / 10 |
-
 Si el mensaje tiene el formato anterior de 9 bytes, se usa el decodificador legado del primer intento.
 
 ## Retención de datos

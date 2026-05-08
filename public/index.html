@@ -64,7 +64,7 @@
           </p>
           <div class="hero-actions">
             <a class="button primary" href="#estaciones">Ver estaciones</a>
-            <a class="button secondary" href="/api/export.xls?days=30" download>Descargar Excel</a>
+            <a class="button secondary" href="/api/export.xlsx?days=30" download>Descargar Excel</a>
           </div>
         </div>
       </section>
@@ -102,7 +102,6 @@
             <article class="metric-card"><span>Ozono</span><strong id="ozono-value">0</strong><small>ppb</small></article>
             <article class="metric-card"><span>CO</span><strong id="co-value">0</strong><small>ppm</small></article>
             <article class="metric-card"><span>SO2</span><strong id="so2-value">0</strong><small>ppb</small></article>
-            <article class="metric-card"><span>Humedad</span><strong id="humedad-value">0</strong><small>%</small></article>
             <article class="metric-card"><span>Temperatura</span><strong id="temp-value">0</strong><small>C</small></article>
           </div>
         </div>
@@ -165,10 +164,10 @@
           </p>
           <div class="sync-row">
             <span id="chart-status" class="sync-status offline">Esperando lecturas</span>
-            <a id="download-station" class="small-button" href="/api/stations/encb-principal/export.xls?days=30" download>
+            <a id="download-station" class="small-button" href="/api/stations/encb-principal/export.xlsx?days=30" download>
               Excel de esta estación
             </a>
-            <a id="download-all" class="small-button ghost" href="/api/export.xls?days=30" download>
+            <a id="download-all" class="small-button ghost" href="/api/export.xlsx?days=30" download>
               Excel últimos 30 días
             </a>
           </div>
@@ -182,7 +181,6 @@
           <article class="chart-card"><div><span>Ozono</span><strong>ppb</strong></div><canvas id="chart-ozono" width="640" height="260"></canvas></article>
           <article class="chart-card"><div><span>CO</span><strong>ppm</strong></div><canvas id="chart-co" width="640" height="260"></canvas></article>
           <article class="chart-card"><div><span>SO2</span><strong>ppb</strong></div><canvas id="chart-so2" width="640" height="260"></canvas></article>
-          <article class="chart-card"><div><span>Humedad</span><strong>%</strong></div><canvas id="chart-humedad" width="640" height="260"></canvas></article>
           <article class="chart-card"><div><span>Temperatura</span><strong>C</strong></div><canvas id="chart-temp" width="640" height="260"></canvas></article>
         </div>
       </section>
@@ -218,17 +216,17 @@
           <article>
             <strong>Reporte diario</strong>
             <p>Lecturas de todas las estaciones durante las últimas 24 horas.</p>
-            <a id="daily-report-link" href="/api/export.xls?days=1" download>Descargar Excel</a>
+            <a id="daily-report-link" href="/api/export.xlsx?days=1" download>Descargar Excel</a>
           </article>
           <article>
             <strong>Histórico mensual</strong>
             <p>Registros de contaminantes y ambiente de los últimos 30 días.</p>
-            <a id="monthly-report-link" href="/api/export.xls?days=30" download>Descargar Excel</a>
+            <a id="monthly-report-link" href="/api/export.xlsx?days=30" download>Descargar Excel</a>
           </article>
           <article>
             <strong>Alertas ambientales</strong>
             <p>Descarga el histórico para revisar valores fuera de rango.</p>
-            <a id="alerts-report-link" href="/api/export.xls?days=30" download>Descargar registros</a>
+            <a id="alerts-report-link" href="/api/export.xlsx?days=30" download>Descargar registros</a>
           </article>
         </div>
       </section>

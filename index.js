@@ -82,7 +82,6 @@ db.serialize(() => {
       pm25 REAL,
       pm10 REAL,
       temperatura REAL,
-      humedad REAL,
       aqi REAL,
       rawData TEXT,
       seqNumber TEXT,
@@ -98,7 +97,6 @@ db.serialize(() => {
     const existingColumns = new Set(columns.map((column) => column.name));
     const migrations = {
       stationId: "ALTER TABLE sensores ADD COLUMN stationId TEXT",
-      humedad: "ALTER TABLE sensores ADD COLUMN humedad REAL",
       aqi: "ALTER TABLE sensores ADD COLUMN aqi REAL",
       rawData: "ALTER TABLE sensores ADD COLUMN rawData TEXT",
       seqNumber: "ALTER TABLE sensores ADD COLUMN seqNumber TEXT",
@@ -175,10 +173,6 @@ function decodeWidePayload(hex) {
     temperatura: readSignedTenths(payload, 10),
   };
 
-  if (payload.length >= 14) {
-    reading.humedad = readUnsignedTenths(payload, 12);
-  }
-
   return reading;
 }
 
@@ -192,7 +186,6 @@ function decodePayload(body) {
     pm25: normalizeNumber(body.pm25 ?? body.pm2_5),
     pm10: normalizeNumber(body.pm10),
     temperatura: normalizeNumber(body.temperatura ?? body.temperature ?? body.temp),
-    humedad: normalizeNumber(body.humedad ?? body.humidity),
   };
 
   const hasDirectValues = Object.values(directReading).some((value) => value !== null);
@@ -255,7 +248,6 @@ function insertReading(station, deviceId, body, reading, res) {
         pm25,
         pm10,
         temperatura,
-        humedad,
         aqi,
         rawData,
         seqNumber,
@@ -263,7 +255,7 @@ function insertReading(station, deviceId, body, reading, res) {
         time,
         receivedAt
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `,
     [
       station.id,
@@ -276,7 +268,6 @@ function insertReading(station, deviceId, body, reading, res) {
       reading.pm25,
       reading.pm10,
       reading.temperatura,
-      reading.humedad,
       reading.aqi,
       body.data || null,
       body.seqNumber || body.seq || null,
@@ -313,12 +304,130 @@ function getDateRange(query) {
   return new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
 }
 
-function escapeHtml(value) {
+function escapeXml(value) {
   return String(value ?? "")
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&apos;");
+}
+
+function crc32(buffer) {
+  let crc = 0xffffffff;
+  for (const byte of buffer) {
+    crc ^= byte;
+    for (let index = 0; index < 8; index += 1) {
+      crc = crc & 1 ? (crc >>> 1) ^ 0xedb88320 : crc >>> 1;
+    }
+  }
+  return (crc ^ 0xffffffff) >>> 0;
+}
+
+function zipFiles(files) {
+  const localParts = [];
+  const centralParts = [];
+  let offset = 0;
+
+  files.forEach((file) => {
+    const name = Buffer.from(file.name);
+    const data = Buffer.from(file.content);
+    const checksum = crc32(data);
+    const localHeader = Buffer.alloc(30);
+    localHeader.writeUInt32LE(0x04034b50, 0);
+    localHeader.writeUInt16LE(20, 4);
+    localHeader.writeUInt16LE(0, 6);
+    localHeader.writeUInt16LE(0, 8);
+    localHeader.writeUInt16LE(0, 10);
+    localHeader.writeUInt16LE(0, 12);
+    localHeader.writeUInt32LE(checksum, 14);
+    localHeader.writeUInt32LE(data.length, 18);
+    localHeader.writeUInt32LE(data.length, 22);
+    localHeader.writeUInt16LE(name.length, 26);
+    localHeader.writeUInt16LE(0, 28);
+
+    localParts.push(localHeader, name, data);
+
+    const centralHeader = Buffer.alloc(46);
+    centralHeader.writeUInt32LE(0x02014b50, 0);
+    centralHeader.writeUInt16LE(20, 4);
+    centralHeader.writeUInt16LE(20, 6);
+    centralHeader.writeUInt16LE(0, 8);
+    centralHeader.writeUInt16LE(0, 10);
+    centralHeader.writeUInt16LE(0, 12);
+    centralHeader.writeUInt16LE(0, 14);
+    centralHeader.writeUInt32LE(checksum, 16);
+    centralHeader.writeUInt32LE(data.length, 20);
+    centralHeader.writeUInt32LE(data.length, 24);
+    centralHeader.writeUInt16LE(name.length, 28);
+    centralHeader.writeUInt16LE(0, 30);
+    centralHeader.writeUInt16LE(0, 32);
+    centralHeader.writeUInt16LE(0, 34);
+    centralHeader.writeUInt16LE(0, 36);
+    centralHeader.writeUInt32LE(0, 38);
+    centralHeader.writeUInt32LE(offset, 42);
+    centralParts.push(centralHeader, name);
+
+    offset += localHeader.length + name.length + data.length;
+  });
+
+  const centralDirectory = Buffer.concat(centralParts);
+  const end = Buffer.alloc(22);
+  end.writeUInt32LE(0x06054b50, 0);
+  end.writeUInt16LE(0, 4);
+  end.writeUInt16LE(0, 6);
+  end.writeUInt16LE(files.length, 8);
+  end.writeUInt16LE(files.length, 10);
+  end.writeUInt32LE(centralDirectory.length, 12);
+  end.writeUInt32LE(offset, 16);
+  end.writeUInt16LE(0, 20);
+
+  return Buffer.concat([...localParts, centralDirectory, end]);
+}
+
+function cellReference(columnIndex, rowIndex) {
+  let column = "";
+  let value = columnIndex + 1;
+  while (value > 0) {
+    const remainder = (value - 1) % 26;
+    column = String.fromCharCode(65 + remainder) + column;
+    value = Math.floor((value - 1) / 26);
+  }
+  return `${column}${rowIndex}`;
+}
+
+function buildSheetXml(columns, rows) {
+  const headerCells = columns
+    .map((column, index) => {
+      const ref = cellReference(index, 1);
+      return `<c r="${ref}" t="inlineStr"><is><t>${escapeXml(column)}</t></is></c>`;
+    })
+    .join("");
+
+  const bodyRows = rows
+    .map((row, rowIndex) => {
+      const excelRow = rowIndex + 2;
+      const cells = columns
+        .map((column, columnIndex) => {
+          const value = row[column];
+          const ref = cellReference(columnIndex, excelRow);
+          if (typeof value === "number" && Number.isFinite(value)) {
+            return `<c r="${ref}"><v>${value}</v></c>`;
+          }
+          return `<c r="${ref}" t="inlineStr"><is><t>${escapeXml(value)}</t></is></c>`;
+        })
+        .join("");
+      return `<row r="${excelRow}">${cells}</row>`;
+    })
+    .join("");
+
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+  <sheetData>
+    <row r="1">${headerCells}</row>
+    ${bodyRows}
+  </sheetData>
+</worksheet>`;
 }
 
 function sendExcel(res, filename, rows) {
@@ -334,26 +443,52 @@ function sendExcel(res, filename, rows) {
     "pm25",
     "pm10",
     "temperatura",
-    "humedad",
     "aqi",
     "time",
     "receivedAt",
   ];
 
-  const tableRows = rows
-    .map(
-      (row) =>
-        `<tr>${columns.map((column) => `<td>${escapeHtml(row[column])}</td>`).join("")}</tr>`
-    )
-    .join("");
+  const files = [
+    {
+      name: "[Content_Types].xml",
+      content: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+  <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
+  <Default Extension="xml" ContentType="application/xml"/>
+  <Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>
+  <Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>
+</Types>`,
+    },
+    {
+      name: "_rels/.rels",
+      content: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/>
+</Relationships>`,
+    },
+    {
+      name: "xl/workbook.xml",
+      content: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+  <sheets><sheet name="Lecturas" sheetId="1" r:id="rId1"/></sheets>
+</workbook>`,
+    },
+    {
+      name: "xl/_rels/workbook.xml.rels",
+      content: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/>
+</Relationships>`,
+    },
+    {
+      name: "xl/worksheets/sheet1.xml",
+      content: buildSheetXml(columns, rows),
+    },
+  ];
 
-  const html = `<!doctype html><html><head><meta charset="utf-8"></head><body><table><thead><tr>${columns
-    .map((column) => `<th>${column}</th>`)
-    .join("")}</tr></thead><tbody>${tableRows}</tbody></table></body></html>`;
-
-  res.header("Content-Type", "application/vnd.ms-excel; charset=utf-8");
+  res.header("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
   res.header("Content-Disposition", `attachment; filename="${filename}"`);
-  res.send(html);
+  res.send(zipFiles(files));
 }
 
 app.get("/api/health", (req, res) => {
@@ -436,7 +571,7 @@ app.get("/api/stations/:stationId/readings", (req, res) => {
   );
 });
 
-app.get("/api/stations/:stationId/export.xls", (req, res) => {
+app.get(["/api/stations/:stationId/export.xlsx", "/api/stations/:stationId/export.xls"], (req, res) => {
   const since = getDateRange({ ...req.query, days: req.query.days || 30 });
 
   db.all(
@@ -448,12 +583,12 @@ app.get("/api/stations/:stationId/export.xls", (req, res) => {
         return;
       }
 
-      sendExcel(res, `${req.params.stationId}-ultimos-30-dias.xls`, rows);
+      sendExcel(res, `${req.params.stationId}-ultimos-30-dias.xlsx`, rows);
     }
   );
 });
 
-app.get("/api/export.xls", (req, res) => {
+app.get(["/api/export.xlsx", "/api/export.xls"], (req, res) => {
   const since = getDateRange({ ...req.query, days: req.query.days || 30 });
 
   db.all(
@@ -465,7 +600,7 @@ app.get("/api/export.xls", (req, res) => {
         return;
       }
 
-      sendExcel(res, "esime-calidad-aire-ultimos-30-dias.xls", rows);
+      sendExcel(res, "esime-calidad-aire-ultimos-30-dias.xlsx", rows);
     }
   );
 });

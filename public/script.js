@@ -55,7 +55,6 @@ const metrics = [
   { field: "ozono", label: "Ozono", color: "#2d8f8a", element: "ozono-value" },
   { field: "co", label: "CO", color: "#b84d2a", element: "co-value" },
   { field: "so2", label: "SO2", color: "#64748b", element: "so2-value" },
-  { field: "humedad", label: "Humedad", color: "#1d70b8", element: "humedad-value" },
   { field: "temperatura", label: "Temperatura", color: "#d97706", element: "temp-value" },
 ];
 
@@ -137,7 +136,6 @@ function normalizeStation(station) {
     ozono: numberOrZero(reading.ozono),
     co: numberOrZero(reading.co),
     so2: numberOrZero(reading.so2),
-    humedad: numberOrZero(reading.humedad),
     temperatura: numberOrZero(reading.temperatura),
     update: formatUpdate(reading.receivedAt || reading.time),
     health: hasReading ? "Con lectura recibida" : "Sin lectura recibida",
@@ -316,11 +314,11 @@ async function loadStationHistory() {
 }
 
 function updateDownloadLinks() {
-  downloadStation.href = `${apiBase}/api/stations/${selectedStationId}/export.xls?days=30`;
-  downloadAll.href = `${apiBase}/api/export.xls?days=30`;
-  dailyReportLink.href = `${apiBase}/api/export.xls?days=1`;
-  monthlyReportLink.href = `${apiBase}/api/export.xls?days=30`;
-  alertsReportLink.href = `${apiBase}/api/export.xls?days=30`;
+  downloadStation.href = `${apiBase}/api/stations/${selectedStationId}/export.xlsx?days=30`;
+  downloadAll.href = `${apiBase}/api/export.xlsx?days=30`;
+  dailyReportLink.href = `${apiBase}/api/export.xlsx?days=1`;
+  monthlyReportLink.href = `${apiBase}/api/export.xlsx?days=30`;
+  alertsReportLink.href = `${apiBase}/api/export.xlsx?days=30`;
 }
 
 async function loadStations() {
