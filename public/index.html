@@ -193,6 +193,57 @@
         </div>
       </section>
 
+      <section id="graficas" class="section charts-section" aria-labelledby="charts-title">
+        <div class="section-heading">
+          <p class="eyebrow">Últimas 24 horas</p>
+          <h2 id="charts-title">Gráficas por contaminante</h2>
+          <p>
+            Las gráficas se alimentan del histórico de la estación seleccionada
+            y se actualizan automáticamente.
+          </p>
+          <div class="sync-row">
+            <span id="chart-status" class="sync-status offline">Esperando lecturas</span>
+            <a id="download-station" class="small-button" href="#" download>
+              Excel de esta estación
+            </a>
+            <a id="download-all" class="small-button ghost" href="#" download>
+              Excel últimos 30 días
+            </a>
+          </div>
+        </div>
+
+        <div class="charts-grid" aria-label="Gráficas históricas">
+          <article class="chart-card">
+            <div>
+              <span>PM2.5</span>
+              <strong>µg/m³</strong>
+            </div>
+            <canvas id="chart-pm25" width="640" height="260"></canvas>
+          </article>
+          <article class="chart-card">
+            <div>
+              <span>PM10</span>
+              <strong>µg/m³</strong>
+            </div>
+            <canvas id="chart-pm10" width="640" height="260"></canvas>
+          </article>
+          <article class="chart-card">
+            <div>
+              <span>CO₂</span>
+              <strong>ppm</strong>
+            </div>
+            <canvas id="chart-co2" width="640" height="260"></canvas>
+          </article>
+          <article class="chart-card">
+            <div>
+              <span>Temperatura</span>
+              <strong>°C</strong>
+            </div>
+            <canvas id="chart-temp" width="640" height="260"></canvas>
+          </article>
+        </div>
+      </section>
+
       <section class="campus-section" aria-labelledby="campus-title">
         <div class="campus-copy">
           <p class="eyebrow">Mapa operativo</p>

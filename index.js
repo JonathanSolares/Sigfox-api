@@ -7,11 +7,12 @@ const db = new sqlite3.Database("data.db");
 const PORT = process.env.PORT || 3000;
 const CALLBACK_TOKEN = process.env.SIGFOX_CALLBACK_TOKEN || "";
 const CORS_ORIGIN = process.env.CORS_ORIGIN || "*";
+const RETENTION_DAYS = Number(process.env.RETENTION_DAYS || 30);
 
 const stations = [
   {
     id: "encb-principal",
-    deviceId: process.env.DEVICE_ENCB_PRINCIPAL || "SIGFOX_DEVICE_ID_1",
+    deviceId: process.env.DEVICE_ENCB_PRINCIPAL || "3DFF9D",
     name: "Estación Principal ENCB",
     description:
       "Monitorea partículas suspendidas y condiciones ambientales del área exterior norte.",
@@ -19,7 +20,7 @@ const stations = [
   },
   {
     id: "encb-secundaria",
-    deviceId: process.env.DEVICE_ENCB_SECUNDARIA || "SIGFOX_DEVICE_ID_2",
+    deviceId: process.env.DEVICE_ENCB_SECUNDARIA || "429246",
     name: "Estación Secundaria ENCB",
     description:
       "Da seguimiento al flujo de aire cerca del acceso peatonal y zonas abiertas.",
@@ -27,7 +28,7 @@ const stations = [
   },
   {
     id: "encb-interior",
-    deviceId: process.env.DEVICE_ENCB_INTERIOR || "SIGFOX_DEVICE_ID_3",
+    deviceId: process.env.DEVICE_ENCB_INTERIOR || "3DEB72",
     name: "Estación Interior ENCB",
     description:
       "Revisa condiciones interiores en laboratorios para apoyar decisiones de ventilación.",
@@ -219,6 +220,11 @@ function findStation(deviceId) {
   );
 }
 
+function purgeOldReadings() {
+  const cutoff = new Date(Date.now() - RETENTION_DAYS * 24 * 60 * 60 * 1000).toISOString();
+  db.run("DELETE FROM sensores WHERE COALESCE(receivedAt, time) < ?", [cutoff]);
+}
+
 function insertReading(station, deviceId, body, reading, res) {
   const receivedAt = new Date().toISOString();
   const time = normalizeSigfoxTime(body.time || body.timestamp);
@@ -283,8 +289,58 @@ function insertReading(station, deviceId, body, reading, res) {
           receivedAt,
         },
       });
+
+      purgeOldReadings();
     }
   );
+}
+
+function getDateRange(query) {
+  const days = Math.min(Math.max(Number(query.days || 1), 1), RETENTION_DAYS);
+  return new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
+}
+
+function escapeHtml(value) {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+function sendExcel(res, filename, rows) {
+  const columns = [
+    "id",
+    "stationId",
+    "device",
+    "nox",
+    "ozono",
+    "co2",
+    "co",
+    "so2",
+    "pm25",
+    "pm10",
+    "temperatura",
+    "humedad",
+    "aqi",
+    "time",
+    "receivedAt",
+  ];
+
+  const tableRows = rows
+    .map(
+      (row) =>
+        `<tr>${columns.map((column) => `<td>${escapeHtml(row[column])}</td>`).join("")}</tr>`
+    )
+    .join("");
+
+  const html = `<!doctype html><html><head><meta charset="utf-8"></head><body><table><thead><tr>${columns
+    .map((column) => `<th>${column}</th>`)
+    .join("")}</tr></thead><tbody>${tableRows}</tbody></table></body></html>`;
+
+  res.header("Content-Type", "application/vnd.ms-excel; charset=utf-8");
+  res.header("Content-Disposition", `attachment; filename="${filename}"`);
+  res.send(html);
 }
 
 app.get("/api/health", (req, res) => {
@@ -350,11 +406,12 @@ app.get("/api/stations", (req, res) => {
 });
 
 app.get("/api/stations/:stationId/readings", (req, res) => {
-  const limit = Math.min(Number(req.query.limit || 100), 500);
+  const limit = Math.min(Number(req.query.limit || 500), 5000);
+  const since = getDateRange(req.query);
 
   db.all(
-    "SELECT * FROM sensores WHERE stationId = ? ORDER BY id DESC LIMIT ?",
-    [req.params.stationId, limit],
+    "SELECT * FROM sensores WHERE stationId = ? AND COALESCE(receivedAt, time) >= ? ORDER BY id ASC LIMIT ?",
+    [req.params.stationId, since, limit],
     (err, rows) => {
       if (err) {
         res.status(500).json({ ok: false, error: err.message });
@@ -362,6 +419,40 @@ app.get("/api/stations/:stationId/readings", (req, res) => {
       }
 
       res.json({ stationId: req.params.stationId, readings: rows });
+    }
+  );
+});
+
+app.get("/api/stations/:stationId/export.xls", (req, res) => {
+  const since = getDateRange({ ...req.query, days: req.query.days || 30 });
+
+  db.all(
+    "SELECT * FROM sensores WHERE stationId = ? AND COALESCE(receivedAt, time) >= ? ORDER BY id ASC",
+    [req.params.stationId, since],
+    (err, rows) => {
+      if (err) {
+        res.status(500).json({ ok: false, error: err.message });
+        return;
+      }
+
+      sendExcel(res, `${req.params.stationId}-ultimos-30-dias.xls`, rows);
+    }
+  );
+});
+
+app.get("/api/export.xls", (req, res) => {
+  const since = getDateRange({ ...req.query, days: req.query.days || 30 });
+
+  db.all(
+    "SELECT * FROM sensores WHERE COALESCE(receivedAt, time) >= ? ORDER BY stationId ASC, id ASC",
+    [since],
+    (err, rows) => {
+      if (err) {
+        res.status(500).json({ ok: false, error: err.message });
+        return;
+      }
+
+      sendExcel(res, "esime-calidad-aire-ultimos-30-dias.xls", rows);
     }
   );
 });

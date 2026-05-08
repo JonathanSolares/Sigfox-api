@@ -24,7 +24,16 @@ DEVICE_ENCB_SECUNDARIA=id-real-sigfox
 DEVICE_ENCB_INTERIOR=id-real-sigfox
 DEVICE_ESIME_CENTRAL=id-real-sigfox
 DEVICE_ESIME_SECUNDARIA=id-real-sigfox
+RETENTION_DAYS=30
 ```
+
+IDs reales configurados por defecto:
+
+| Estación | ID Sigfox |
+| --- | --- |
+| Estación Principal ENCB | `3DFF9D` |
+| Estación Secundaria ENCB | `429246` |
+| Estación Interior ENCB | `3DEB72` |
 
 ## Callback de Sigfox
 
@@ -60,11 +69,18 @@ El endpoint anterior `/sigfox` sigue funcionando para no romper la configuració
 
 ```text
 GET /api/stations
-GET /api/stations/:stationId/readings
+GET /api/stations/:stationId/readings?days=1
+GET /api/stations/:stationId/export.xls?days=30
+GET /api/export.xls?days=30
 GET /api/health
 ```
 
-La web vive en `public/` y consulta `/api/stations`. Si frontend y backend están en el mismo dominio, deja `public/config.js` con:
+La web vive en `public/`, consulta `/api/stations` para los datos actuales y
+`/api/stations/:stationId/readings?days=1` para graficar las últimas 24 horas.
+También ofrece descarga Excel de la estación seleccionada o de todas las
+estaciones de los últimos 30 días.
+
+Si frontend y backend están en el mismo dominio, deja `public/config.js` con:
 
 ```js
 window.ESIME_API_BASE = "";
@@ -90,3 +106,8 @@ Para payload hexadecimal largo, el orden asumido es:
 | 12-13 | Humedad opcional | entero / 10 |
 
 Si el mensaje tiene el formato anterior de 9 bytes, se usa el decodificador legado del primer intento.
+
+## Retención de datos
+
+El servidor limpia lecturas con más de `RETENTION_DAYS` días después de recibir
+cada callback. Por defecto conserva 30 días.
