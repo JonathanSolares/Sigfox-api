@@ -47,15 +47,14 @@
             <a href="#estaciones" data-station-link="esime-secundaria">Secundaria ESIME</a>
           </div>
         </div>
+        <a href="#graficas">Gráficas</a>
         <a href="#reportes">Reportes</a>
         <a href="#proyecto">Proyecto</a>
-        <a class="nav-cta" href="#contacto">Contacto</a>
       </nav>
     </header>
 
     <main id="inicio">
       <section class="hero" aria-labelledby="hero-title">
-        <div class="hero-overlay"></div>
         <div class="hero-content">
           <p class="eyebrow">Proyecto Calidad del Aire</p>
           <h1 id="hero-title">ESIME Inteligente - ESIME Zacatenco</h1>
@@ -65,7 +64,7 @@
           </p>
           <div class="hero-actions">
             <a class="button primary" href="#estaciones">Ver estaciones</a>
-            <a class="button secondary" href="#reportes">Descargar reporte</a>
+            <a class="button secondary" href="/api/export.xls?days=30" download>Descargar Excel</a>
           </div>
         </div>
       </section>
@@ -75,11 +74,10 @@
           <p class="eyebrow">Lectura actual</p>
           <h2 id="quality-title">Panel de calidad del aire</h2>
           <p>
-            Lecturas por estación recibidas desde el backend Sigfox del
-            proyecto.
+            Lecturas por estación recibidas desde el backend Sigfox del proyecto.
           </p>
           <div class="sync-row" aria-live="polite">
-            <span id="sync-status" class="sync-status offline">Usando datos locales</span>
+            <span id="sync-status" class="sync-status loading">Consultando backend...</span>
             <button id="refresh-data" class="small-button" type="button">
               Actualizar datos
             </button>
@@ -88,35 +86,24 @@
 
         <div class="dashboard">
           <article class="aqi-card">
-            <span class="card-label">Índice general</span>
-            <strong id="aqi-value">42</strong>
-            <span id="aqi-status" class="status good">Buena</span>
+            <span class="card-label">Índice interno de referencia</span>
+            <strong id="aqi-value">0</strong>
+            <span id="aqi-status" class="status good">Sin lectura</span>
             <p id="aqi-copy">
-              Condiciones adecuadas para actividades normales dentro del campus.
+              El índice se calcula con la lectura más reciente recibida.
             </p>
           </article>
 
           <div class="metric-grid" aria-label="Indicadores ambientales">
-            <article class="metric-card">
-              <span>PM2.5</span>
-              <strong id="pm25-value">12</strong>
-              <small>µg/m³</small>
-            </article>
-            <article class="metric-card">
-              <span>PM10</span>
-              <strong id="pm10-value">28</strong>
-              <small>µg/m³</small>
-            </article>
-            <article class="metric-card">
-              <span>CO₂</span>
-              <strong id="co2-value">520</strong>
-              <small>ppm</small>
-            </article>
-            <article class="metric-card">
-              <span>Temperatura</span>
-              <strong id="temp-value">23</strong>
-              <small>°C</small>
-            </article>
+            <article class="metric-card"><span>PM2.5</span><strong id="pm25-value">0</strong><small>ug/m3</small></article>
+            <article class="metric-card"><span>PM10</span><strong id="pm10-value">0</strong><small>ug/m3</small></article>
+            <article class="metric-card"><span>CO2</span><strong id="co2-value">0</strong><small>ppm</small></article>
+            <article class="metric-card"><span>NOx</span><strong id="nox-value">0</strong><small>ppb</small></article>
+            <article class="metric-card"><span>Ozono</span><strong id="ozono-value">0</strong><small>ppb</small></article>
+            <article class="metric-card"><span>CO</span><strong id="co-value">0</strong><small>ppm</small></article>
+            <article class="metric-card"><span>SO2</span><strong id="so2-value">0</strong><small>ppb</small></article>
+            <article class="metric-card"><span>Humedad</span><strong id="humedad-value">0</strong><small>%</small></article>
+            <article class="metric-card"><span>Temperatura</span><strong id="temp-value">0</strong><small>C</small></article>
           </div>
         </div>
       </section>
@@ -131,63 +118,38 @@
           <aside class="station-list" aria-label="Lista de estaciones">
             <button class="station-option active" type="button" data-station="encb-principal">
               <span class="station-dot"></span>
-              <span>
-                <strong>Estación Principal ENCB</strong>
-                <small>Exterior norte</small>
-              </span>
+              <span><strong>Estación Principal ENCB</strong><small>ID 3DFF9D</small></span>
             </button>
             <button class="station-option" type="button" data-station="encb-secundaria">
               <span class="station-dot"></span>
-              <span>
-                <strong>Estación Secundaria ENCB</strong>
-                <small>Acceso peatonal</small>
-              </span>
+              <span><strong>Estación Secundaria ENCB</strong><small>ID 429246</small></span>
             </button>
             <button class="station-option" type="button" data-station="encb-interior">
               <span class="station-dot"></span>
-              <span>
-                <strong>Estación Interior ENCB</strong>
-                <small>Laboratorios</small>
-              </span>
+              <span><strong>Estación Interior ENCB</strong><small>ID 3DEB72</small></span>
             </button>
             <button class="station-option" type="button" data-station="esime-central">
-              <span class="station-dot"></span>
-              <span>
-                <strong>Estación Central ESIME</strong>
-                <small>Plaza principal</small>
-              </span>
+              <span class="station-dot inactive"></span>
+              <span><strong>Estación Central ESIME</strong><small>Sin ID asignado</small></span>
             </button>
             <button class="station-option" type="button" data-station="esime-secundaria">
-              <span class="station-dot warning"></span>
-              <span>
-                <strong>Estación Secundaria ESIME</strong>
-                <small>Zona de talleres</small>
-              </span>
+              <span class="station-dot inactive"></span>
+              <span><strong>Estación Secundaria ESIME</strong><small>Sin ID asignado</small></span>
             </button>
           </aside>
 
           <article class="station-detail">
             <div>
-              <span id="station-state" class="status good">Activa</span>
+              <span id="station-state" class="status good">Sin lectura</span>
               <h3 id="station-name">Estación Principal ENCB</h3>
               <p id="station-description">
-                Monitorea partículas suspendidas y condiciones ambientales del
-                área exterior norte.
+                Monitorea partículas suspendidas y condiciones ambientales.
               </p>
             </div>
             <dl class="station-facts">
-              <div>
-                <dt>Actualización</dt>
-                <dd id="station-update">Hace 2 min</dd>
-              </div>
-              <div>
-                <dt>Ubicación</dt>
-                <dd id="station-location">Exterior norte ENCB</dd>
-              </div>
-              <div>
-                <dt>Estado de sensor</dt>
-                <dd id="station-health">Operativo</dd>
-              </div>
+              <div><dt>Actualización</dt><dd id="station-update">Sin lectura reciente</dd></div>
+              <div><dt>Ubicación</dt><dd id="station-location">Exterior norte ENCB</dd></div>
+              <div><dt>Estado de sensor</dt><dd id="station-health">Sin lectura</dd></div>
             </dl>
           </article>
         </div>
@@ -199,48 +161,29 @@
           <h2 id="charts-title">Gráficas por contaminante</h2>
           <p>
             Las gráficas se alimentan del histórico de la estación seleccionada
-            y se actualizan automáticamente.
+            y se actualizan automáticamente cada 5 minutos.
           </p>
           <div class="sync-row">
             <span id="chart-status" class="sync-status offline">Esperando lecturas</span>
-            <a id="download-station" class="small-button" href="#" download>
+            <a id="download-station" class="small-button" href="/api/stations/encb-principal/export.xls?days=30" download>
               Excel de esta estación
             </a>
-            <a id="download-all" class="small-button ghost" href="#" download>
+            <a id="download-all" class="small-button ghost" href="/api/export.xls?days=30" download>
               Excel últimos 30 días
             </a>
           </div>
         </div>
 
         <div class="charts-grid" aria-label="Gráficas históricas">
-          <article class="chart-card">
-            <div>
-              <span>PM2.5</span>
-              <strong>µg/m³</strong>
-            </div>
-            <canvas id="chart-pm25" width="640" height="260"></canvas>
-          </article>
-          <article class="chart-card">
-            <div>
-              <span>PM10</span>
-              <strong>µg/m³</strong>
-            </div>
-            <canvas id="chart-pm10" width="640" height="260"></canvas>
-          </article>
-          <article class="chart-card">
-            <div>
-              <span>CO₂</span>
-              <strong>ppm</strong>
-            </div>
-            <canvas id="chart-co2" width="640" height="260"></canvas>
-          </article>
-          <article class="chart-card">
-            <div>
-              <span>Temperatura</span>
-              <strong>°C</strong>
-            </div>
-            <canvas id="chart-temp" width="640" height="260"></canvas>
-          </article>
+          <article class="chart-card"><div><span>PM2.5</span><strong>ug/m3</strong></div><canvas id="chart-pm25" width="640" height="260"></canvas></article>
+          <article class="chart-card"><div><span>PM10</span><strong>ug/m3</strong></div><canvas id="chart-pm10" width="640" height="260"></canvas></article>
+          <article class="chart-card"><div><span>CO2</span><strong>ppm</strong></div><canvas id="chart-co2" width="640" height="260"></canvas></article>
+          <article class="chart-card"><div><span>NOx</span><strong>ppb</strong></div><canvas id="chart-nox" width="640" height="260"></canvas></article>
+          <article class="chart-card"><div><span>Ozono</span><strong>ppb</strong></div><canvas id="chart-ozono" width="640" height="260"></canvas></article>
+          <article class="chart-card"><div><span>CO</span><strong>ppm</strong></div><canvas id="chart-co" width="640" height="260"></canvas></article>
+          <article class="chart-card"><div><span>SO2</span><strong>ppb</strong></div><canvas id="chart-so2" width="640" height="260"></canvas></article>
+          <article class="chart-card"><div><span>Humedad</span><strong>%</strong></div><canvas id="chart-humedad" width="640" height="260"></canvas></article>
+          <article class="chart-card"><div><span>Temperatura</span><strong>C</strong></div><canvas id="chart-temp" width="640" height="260"></canvas></article>
         </div>
       </section>
 
@@ -267,25 +210,25 @@
           <p class="eyebrow">Reportes</p>
           <h2 id="reports-title">Información lista para compartir</h2>
           <p>
-            Agrega aquí la descarga real del CSV, PDF o dashboard cuando tengas
-            definida la fuente de datos.
+            Descarga los registros almacenados en Excel. El sistema conserva una
+            ventana móvil de los últimos 30 días.
           </p>
         </div>
         <div class="report-grid">
           <article>
             <strong>Reporte diario</strong>
-            <p>Promedios por estación, máximos detectados y estado general.</p>
-            <a href="#" aria-disabled="true">Próximamente</a>
+            <p>Lecturas de todas las estaciones durante las últimas 24 horas.</p>
+            <a id="daily-report-link" href="/api/export.xls?days=1" download>Descargar Excel</a>
           </article>
           <article>
             <strong>Histórico mensual</strong>
-            <p>Comparativa de partículas, temperatura, humedad y CO₂.</p>
-            <a href="#" aria-disabled="true">Próximamente</a>
+            <p>Registros de contaminantes y ambiente de los últimos 30 días.</p>
+            <a id="monthly-report-link" href="/api/export.xls?days=30" download>Descargar Excel</a>
           </article>
           <article>
             <strong>Alertas ambientales</strong>
-            <p>Eventos fuera de rango y recomendaciones de respuesta.</p>
-            <a href="#" aria-disabled="true">Próximamente</a>
+            <p>Descarga el histórico para revisar valores fuera de rango.</p>
+            <a id="alerts-report-link" href="/api/export.xls?days=30" download>Descargar registros</a>
           </article>
         </div>
       </section>
@@ -296,9 +239,8 @@
           <h2 id="project-title">Un campus que entiende su ambiente</h2>
         </div>
         <p>
-          ESIME Inteligente busca integrar sensores, visualización de datos y
-          reportes accesibles para que estudiantes, docentes y responsables de
-          mantenimiento consulten el estado ambiental del campus con claridad.
+          ESIME Inteligente integra sensores, visualización de datos y reportes
+          accesibles para consultar el estado ambiental del campus.
         </p>
       </section>
     </main>
@@ -314,8 +256,8 @@
       <div class="footer-links">
         <a href="#calidad">Calidad del aire</a>
         <a href="#estaciones">Estaciones</a>
+        <a href="#graficas">Gráficas</a>
         <a href="#reportes">Reportes</a>
-        <a href="mailto:contacto@esime-inteligente.local">Contacto</a>
       </div>
     </footer>
 

@@ -129,10 +129,22 @@ function readSignedTenths(payload, offset) {
 }
 
 function calculateAqi(reading) {
-  const pm25Score = Number(reading.pm25 || 0) * 3;
-  const pm10Score = Number(reading.pm10 || 0) * 1.5;
-  const gasScore = Math.max(Number(reading.nox || 0), Number(reading.ozono || 0));
-  return Math.round(Math.max(pm25Score, pm10Score, gasScore));
+  const thresholds = {
+    pm25: 25,
+    pm10: 50,
+    co2: 1000,
+    nox: 100,
+    ozono: 100,
+    co: 9,
+    so2: 75,
+  };
+
+  const scores = Object.entries(thresholds).map(([field, limit]) => {
+    const value = Number(reading[field] || 0);
+    return limit > 0 ? (value / limit) * 100 : 0;
+  });
+
+  return Math.round(Math.max(0, ...scores));
 }
 
 function decodeLegacyPayload(hex) {

@@ -116,3 +116,23 @@ Si el mensaje tiene el formato anterior de 9 bytes, se usa el decodificador lega
 
 El servidor limpia lecturas con más de `RETENTION_DAYS` días después de recibir
 cada callback. Por defecto conserva 30 días.
+
+## Índice interno de referencia
+
+El índice mostrado en la página no es un ICA oficial. Es un indicador interno
+para comparar rápidamente la lectura actual contra umbrales de referencia:
+
+```text
+max(
+  PM2.5 / 25,
+  PM10 / 50,
+  CO2 / 1000,
+  NOx / 100,
+  Ozono / 100,
+  CO / 9,
+  SO2 / 75
+) * 100
+```
+
+Si una estación no tiene lectura, todos sus valores y su índice se muestran en
+`0`.

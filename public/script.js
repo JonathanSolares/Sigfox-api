@@ -1,4 +1,4 @@
-const fallbackStations = {
+const stationDefinitions = {
   "encb-principal": {
     id: "encb-principal",
     deviceId: "3DFF9D",
@@ -6,15 +6,6 @@ const fallbackStations = {
     description:
       "Monitorea partículas suspendidas y condiciones ambientales del área exterior norte.",
     location: "Exterior norte ENCB",
-    update: "Datos demo",
-    health: "Sin conexión al backend",
-    status: "Activa",
-    level: "good",
-    aqi: 42,
-    pm25: 12,
-    pm10: 28,
-    co2: 520,
-    temp: 23,
   },
   "encb-secundaria": {
     id: "encb-secundaria",
@@ -23,15 +14,6 @@ const fallbackStations = {
     description:
       "Da seguimiento al flujo de aire cerca del acceso peatonal y zonas abiertas.",
     location: "Acceso peatonal ENCB",
-    update: "Datos demo",
-    health: "Sin conexión al backend",
-    status: "Activa",
-    level: "good",
-    aqi: 48,
-    pm25: 15,
-    pm10: 31,
-    co2: 548,
-    temp: 24,
   },
   "encb-interior": {
     id: "encb-interior",
@@ -40,59 +22,54 @@ const fallbackStations = {
     description:
       "Revisa condiciones interiores en laboratorios para apoyar decisiones de ventilación.",
     location: "Laboratorios ENCB",
-    update: "Datos demo",
-    health: "Sin conexión al backend",
-    status: "Activa",
-    level: "good",
-    aqi: 36,
-    pm25: 9,
-    pm10: 19,
-    co2: 610,
-    temp: 22,
   },
   "esime-central": {
     id: "esime-central",
-    deviceId: "DEMO004",
+    deviceId: "",
     name: "Estación Central ESIME",
-    description:
-      "Concentra lecturas representativas de la plaza principal y rutas de mayor tránsito.",
+    description: "Estación pendiente de asignar a un dispositivo Sigfox.",
     location: "Plaza principal ESIME",
-    update: "Datos demo",
-    health: "Sin conexión al backend",
-    status: "Activa",
-    level: "good",
-    aqi: 44,
-    pm25: 13,
-    pm10: 27,
-    co2: 535,
-    temp: 23,
   },
   "esime-secundaria": {
     id: "esime-secundaria",
-    deviceId: "DEMO005",
+    deviceId: "",
     name: "Estación Secundaria ESIME",
-    description:
-      "Supervisa zona de talleres, donde puede subir la concentración de partículas.",
+    description: "Estación pendiente de asignar a un dispositivo Sigfox.",
     location: "Zona de talleres ESIME",
-    update: "Datos demo",
-    health: "Sin conexión al backend",
-    status: "Atención",
-    level: "warning",
-    aqi: 76,
-    pm25: 26,
-    pm10: 54,
-    co2: 690,
-    temp: 25,
   },
 };
 
+const configuredApiBase = window.ESIME_API_BASE;
 const apiBase =
-  window.ESIME_API_BASE ||
-  (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1"
-    ? "http://localhost:8080"
-    : "");
+  typeof configuredApiBase === "string"
+    ? configuredApiBase.replace(/\/$/, "")
+    : window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1"
+      ? "http://localhost:8080"
+      : "";
 
-let stations = { ...fallbackStations };
+const metrics = [
+  { field: "pm25", label: "PM2.5", color: "#0f7b52", element: "pm25-value" },
+  { field: "pm10", label: "PM10", color: "#2978a0", element: "pm10-value" },
+  { field: "co2", label: "CO2", color: "#805100", element: "co2-value" },
+  { field: "nox", label: "NOx", color: "#7a4bc2", element: "nox-value" },
+  { field: "ozono", label: "Ozono", color: "#2d8f8a", element: "ozono-value" },
+  { field: "co", label: "CO", color: "#b84d2a", element: "co-value" },
+  { field: "so2", label: "SO2", color: "#64748b", element: "so2-value" },
+  { field: "humedad", label: "Humedad", color: "#1d70b8", element: "humedad-value" },
+  { field: "temperatura", label: "Temperatura", color: "#d97706", element: "temp-value" },
+];
+
+const thresholds = {
+  pm25: 25,
+  pm10: 50,
+  co2: 1000,
+  nox: 100,
+  ozono: 100,
+  co: 9,
+  so2: 75,
+};
+
+let stations = { ...stationDefinitions };
 let selectedStationId = "encb-principal";
 
 const nav = document.querySelector(".site-nav");
@@ -105,56 +82,71 @@ const syncStatus = document.getElementById("sync-status");
 const chartStatus = document.getElementById("chart-status");
 const downloadStation = document.getElementById("download-station");
 const downloadAll = document.getElementById("download-all");
-const chartCanvases = {
-  pm25: document.getElementById("chart-pm25"),
-  pm10: document.getElementById("chart-pm10"),
-  co2: document.getElementById("chart-co2"),
-  temp: document.getElementById("chart-temp"),
-};
+const dailyReportLink = document.getElementById("daily-report-link");
+const monthlyReportLink = document.getElementById("monthly-report-link");
+const alertsReportLink = document.getElementById("alerts-report-link");
 
 function setText(id, value) {
-  document.getElementById(id).textContent = value ?? "Sin dato";
+  document.getElementById(id).textContent = value ?? "0";
+}
+
+function numberOrZero(value) {
+  const number = Number(value);
+  return Number.isFinite(number) ? number : 0;
+}
+
+function formatNumber(value) {
+  const number = numberOrZero(value);
+  return Number.isInteger(number) ? String(number) : number.toFixed(1);
 }
 
 function formatUpdate(value) {
   if (!value) return "Sin lectura reciente";
-
   const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-
+  if (Number.isNaN(date.getTime())) return "Sin lectura reciente";
   return new Intl.DateTimeFormat("es-MX", {
     dateStyle: "short",
     timeStyle: "short",
   }).format(date);
 }
 
-function calculateLevel(station) {
-  if (station.level) return station.level;
-  if (Number(station.aqi) >= 75 || Number(station.pm25) >= 25 || Number(station.pm10) >= 50) {
-    return "warning";
-  }
-  return "good";
+function calculateReferenceIndex(reading) {
+  const scores = Object.entries(thresholds).map(([field, limit]) => {
+    return limit > 0 ? (numberOrZero(reading[field]) / limit) * 100 : 0;
+  });
+  return Math.round(Math.max(0, ...scores));
+}
+
+function hasRealReading(station) {
+  return Boolean(station?.latest || station?.receivedAt || station?.time);
 }
 
 function normalizeStation(station) {
-  const fallback = fallbackStations[station.id] || {};
-  const latest = station.latest || station;
-  const level = calculateLevel({ ...station, ...latest });
-
-  return {
-    ...fallback,
+  const base = stationDefinitions[station?.id] || {};
+  const latest = station?.latest || null;
+  const reading = latest || {};
+  const hasReading = Boolean(latest);
+  const normalized = {
+    ...base,
     ...station,
-    ...latest,
-    id: station.id || fallback.id,
-    deviceId: station.deviceId || fallback.deviceId,
-    name: station.name || fallback.name,
-    description: station.description || fallback.description,
-    location: station.location || fallback.location,
-    update: formatUpdate(latest.receivedAt || latest.timestamp || station.update),
-    health: station.health || (latest.receivedAt ? "Operativo" : fallback.health),
-    status: level === "warning" ? "Atención" : station.status || fallback.status || "Activa",
-    level,
+    latest,
+    pm25: numberOrZero(reading.pm25),
+    pm10: numberOrZero(reading.pm10),
+    co2: numberOrZero(reading.co2),
+    nox: numberOrZero(reading.nox),
+    ozono: numberOrZero(reading.ozono),
+    co: numberOrZero(reading.co),
+    so2: numberOrZero(reading.so2),
+    humedad: numberOrZero(reading.humedad),
+    temperatura: numberOrZero(reading.temperatura),
+    update: formatUpdate(reading.receivedAt || reading.time),
+    health: hasReading ? "Con lectura recibida" : "Sin lectura recibida",
   };
+
+  normalized.aqi = hasReading ? numberOrZero(reading.aqi) || calculateReferenceIndex(normalized) : 0;
+  normalized.level = !hasReading ? "good" : normalized.aqi >= 100 ? "warning" : "good";
+  normalized.status = hasReading ? (normalized.level === "warning" ? "Atención" : "Activa") : "Sin lectura";
+  return normalized;
 }
 
 function setSyncStatus(message, state) {
@@ -168,8 +160,7 @@ function setChartStatus(message, state) {
 }
 
 function renderStation(stationId) {
-  const station = normalizeStation(stations[stationId]);
-  if (!station) return;
+  const station = normalizeStation(stations[stationId] || stationDefinitions[stationId]);
   selectedStationId = stationId;
 
   stationButtons.forEach((button) => {
@@ -183,40 +174,48 @@ function renderStation(stationId) {
   setText("station-health", station.health);
   setText("station-state", station.status);
   setText("aqi-value", station.aqi);
-  setText("pm25-value", station.pm25);
-  setText("pm10-value", station.pm10);
-  setText("co2-value", station.co2);
-  setText("temp-value", station.temp);
+
+  metrics.forEach((metric) => {
+    setText(metric.element, formatNumber(station[metric.field]));
+  });
 
   const stationStatus = document.getElementById("station-state");
   const aqiStatus = document.getElementById("aqi-status");
   stationStatus.className = `status ${station.level}`;
   aqiStatus.className = `status ${station.level}`;
 
-  if (station.level === "warning") {
-    aqiStatus.textContent = "Moderada";
-    setText(
-      "aqi-copy",
-      "Conviene revisar ventilación y observar posibles fuentes de partículas."
-    );
+  if (!hasRealReading(station)) {
+    aqiStatus.textContent = "Sin lectura";
+    setText("aqi-copy", "Esta estación todavía no tiene datos recibidos por Sigfox.");
+  } else if (station.level === "warning") {
+    aqiStatus.textContent = "Revisar";
+    setText("aqi-copy", "El índice interno superó el umbral de referencia configurado.");
   } else {
-    aqiStatus.textContent = "Buena";
-    setText(
-      "aqi-copy",
-      "Condiciones adecuadas para actividades normales dentro del campus."
-    );
+    aqiStatus.textContent = "Normal";
+    setText("aqi-copy", "Lectura dentro del rango de referencia interno.");
   }
 
   updateDownloadLinks();
 }
 
+function mergeStations(apiStations) {
+  const nextStations = { ...stationDefinitions };
+  apiStations.forEach((station) => {
+    if (!station.id) return;
+    nextStations[station.id] = {
+      ...(nextStations[station.id] || {}),
+      ...station,
+    };
+  });
+  stations = nextStations;
+}
+
 function getReadingValue(reading, field) {
-  if (field === "temp") return Number(reading.temperatura ?? reading.temperature ?? reading.temp);
-  return Number(reading[field]);
+  return numberOrZero(reading[field]);
 }
 
 function getReadingTime(reading) {
-  return new Date(reading.receivedAt || reading.timestamp || reading.time || Date.now());
+  return new Date(reading.receivedAt || reading.time || Date.now());
 }
 
 function drawChart(canvas, readings, field, color) {
@@ -229,7 +228,7 @@ function drawChart(canvas, readings, field, color) {
       value: getReadingValue(reading, field),
       time: getReadingTime(reading),
     }))
-    .filter((point) => Number.isFinite(point.value) && !Number.isNaN(point.time.getTime()));
+    .filter((point) => !Number.isNaN(point.time.getTime()));
 
   context.clearRect(0, 0, width, height);
   context.fillStyle = "#fbfff9";
@@ -257,7 +256,6 @@ function drawChart(canvas, readings, field, color) {
   const maxValue = Math.max(...values.map((point) => point.value), 1);
   const minValue = Math.min(...values.map((point) => point.value), 0);
   const range = Math.max(maxValue - minValue, 1);
-
   const toX = (time) =>
     padding + ((time.getTime() - minTime) / (maxTime - minTime)) * (width - padding * 2);
   const toY = (value) =>
@@ -267,7 +265,7 @@ function drawChart(canvas, readings, field, color) {
   context.lineWidth = 3;
   context.beginPath();
   values.forEach((point, index) => {
-    const x = toX(point.time);
+    const x = Math.max(padding, Math.min(width - padding, toX(point.time)));
     const y = toY(point.value);
     if (index === 0) context.moveTo(x, y);
     else context.lineTo(x, y);
@@ -276,40 +274,32 @@ function drawChart(canvas, readings, field, color) {
 
   context.fillStyle = color;
   values.forEach((point) => {
+    const x = Math.max(padding, Math.min(width - padding, toX(point.time)));
     context.beginPath();
-    context.arc(toX(point.time), toY(point.value), 4, 0, Math.PI * 2);
+    context.arc(x, toY(point.value), 4, 0, Math.PI * 2);
     context.fill();
   });
 
   context.fillStyle = "#5a6f67";
   context.font = "15px Titillium Web";
-  context.fillText(String(Number(maxValue.toFixed(1))), 6, padding + 5);
-  context.fillText(String(Number(minValue.toFixed(1))), 6, height - padding);
-  context.fillText("24 h", width - padding - 24, height - 8);
+  context.fillText(formatNumber(maxValue), 6, padding + 5);
+  context.fillText(formatNumber(minValue), 6, height - padding);
 }
 
 async function loadStationHistory() {
-  if (!apiBase) {
-    setChartStatus("Conecta el backend para ver gráficas reales", "offline");
-    Object.entries(chartCanvases).forEach(([field, canvas]) => drawChart(canvas, [], field, "#0f7b52"));
-    updateDownloadLinks();
-    return;
-  }
-
   try {
     const response = await fetch(
       `${apiBase}/api/stations/${selectedStationId}/readings?days=1&limit=5000`,
       { headers: { Accept: "application/json" } }
     );
-
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
 
     const payload = await response.json();
     const readings = payload.readings || [];
-    drawChart(chartCanvases.pm25, readings, "pm25", "#0f7b52");
-    drawChart(chartCanvases.pm10, readings, "pm10", "#2978a0");
-    drawChart(chartCanvases.co2, readings, "co2", "#805100");
-    drawChart(chartCanvases.temp, readings, "temp", "#b84d2a");
+    metrics.forEach((metric) => {
+      const canvas = document.getElementById(`chart-${metric.field === "temperatura" ? "temp" : metric.field}`);
+      if (canvas) drawChart(canvas, readings, metric.field, metric.color);
+    });
     setChartStatus(
       readings.length
         ? `Mostrando ${readings.length} lecturas de las últimas 24 horas`
@@ -318,35 +308,22 @@ async function loadStationHistory() {
     );
   } catch (error) {
     setChartStatus("No se pudo cargar el histórico", "offline");
+    metrics.forEach((metric) => {
+      const canvas = document.getElementById(`chart-${metric.field === "temperatura" ? "temp" : metric.field}`);
+      if (canvas) drawChart(canvas, [], metric.field, metric.color);
+    });
   }
 }
 
 function updateDownloadLinks() {
-  const base = apiBase || "";
-  downloadStation.href = `${base}/api/stations/${selectedStationId}/export.xls?days=30`;
-  downloadAll.href = `${base}/api/export.xls?days=30`;
-}
-
-function mergeStations(apiStations) {
-  const nextStations = { ...fallbackStations };
-
-  apiStations.forEach((station) => {
-    if (!station.id) return;
-    nextStations[station.id] = {
-      ...(nextStations[station.id] || {}),
-      ...station,
-    };
-  });
-
-  stations = nextStations;
+  downloadStation.href = `${apiBase}/api/stations/${selectedStationId}/export.xls?days=30`;
+  downloadAll.href = `${apiBase}/api/export.xls?days=30`;
+  dailyReportLink.href = `${apiBase}/api/export.xls?days=1`;
+  monthlyReportLink.href = `${apiBase}/api/export.xls?days=30`;
+  alertsReportLink.href = `${apiBase}/api/export.xls?days=30`;
 }
 
 async function loadStations() {
-  if (!apiBase) {
-    renderStation(selectedStationId);
-    return;
-  }
-
   refreshButton.disabled = true;
   setSyncStatus("Consultando backend...", "loading");
 
@@ -354,16 +331,14 @@ async function loadStations() {
     const response = await fetch(`${apiBase}/api/stations`, {
       headers: { Accept: "application/json" },
     });
-
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}`);
-    }
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
 
     const payload = await response.json();
     mergeStations(payload.stations || []);
     setSyncStatus("Conectado al backend Sigfox", "online");
   } catch (error) {
-    setSyncStatus("Backend no disponible, usando datos locales", "offline");
+    stations = { ...stationDefinitions };
+    setSyncStatus("No se pudo conectar con el backend", "offline");
   } finally {
     refreshButton.disabled = false;
     renderStation(selectedStationId);
@@ -403,10 +378,8 @@ stationButtons.forEach((button) => {
   });
 });
 
-refreshButton.addEventListener("click", () => {
-  loadStations();
-  loadStationHistory();
-});
+refreshButton.addEventListener("click", loadStations);
 
+renderStation(selectedStationId);
 loadStations();
 setInterval(loadStations, 5 * 60 * 1000);

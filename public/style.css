@@ -450,6 +450,11 @@ h3 {
   box-shadow: 0 0 0 6px rgba(245, 184, 75, 0.18);
 }
 
+.station-dot.inactive {
+  background: #9aa8a1;
+  box-shadow: 0 0 0 6px rgba(90, 111, 103, 0.14);
+}
+
 .station-option small {
   display: block;
   color: var(--muted);
