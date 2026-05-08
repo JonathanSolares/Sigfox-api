@@ -1,0 +1,92 @@
+# ESIME Inteligente Sigfox API
+
+Servidor Express para recibir callbacks de Sigfox, guardar lecturas en SQLite y mostrar el panel web de calidad del aire.
+
+## DigitalOcean
+
+El proyecto se despliega como Node.js app. DigitalOcean debe ejecutar:
+
+```bash
+npm start
+```
+
+No configures `PORT`; DigitalOcean lo asigna automáticamente.
+
+## Variables de entorno
+
+Configura en DigitalOcean:
+
+```text
+SIGFOX_CALLBACK_TOKEN=un-token-secreto
+CORS_ORIGIN=*
+DEVICE_ENCB_PRINCIPAL=id-real-sigfox
+DEVICE_ENCB_SECUNDARIA=id-real-sigfox
+DEVICE_ENCB_INTERIOR=id-real-sigfox
+DEVICE_ESIME_CENTRAL=id-real-sigfox
+DEVICE_ESIME_SECUNDARIA=id-real-sigfox
+```
+
+## Callback de Sigfox
+
+URL:
+
+```text
+https://lionfish-app-lqd2h.ondigitalocean.app/api/sigfox/callback?token=un-token-secreto
+```
+
+Método: `POST`
+
+Headers:
+
+```text
+Content-Type: application/json
+```
+
+Body recomendado:
+
+```json
+{
+  "device": "{device}",
+  "time": "{time}",
+  "data": "{data}",
+  "seqNumber": "{seqNumber}",
+  "duplicate": "{duplicate}"
+}
+```
+
+El endpoint anterior `/sigfox` sigue funcionando para no romper la configuración previa.
+
+## API para la página
+
+```text
+GET /api/stations
+GET /api/stations/:stationId/readings
+GET /api/health
+```
+
+La web vive en `public/` y consulta `/api/stations`. Si frontend y backend están en el mismo dominio, deja `public/config.js` con:
+
+```js
+window.ESIME_API_BASE = "";
+```
+
+## Payload
+
+El servidor acepta dos formas:
+
+1. Valores ya decodificados: `pm25`, `pm10`, `co2`, `nox`, `ozono`, `temperatura`.
+2. Payload hexadecimal en `data`.
+
+Para payload hexadecimal largo, el orden asumido es:
+
+| Bytes | Campo | Escala |
+| --- | --- | --- |
+| 0-1 | PM2.5 | entero / 10 |
+| 2-3 | PM10 | entero / 10 |
+| 4-5 | CO2 | ppm |
+| 6-7 | NOx | entero / 10 |
+| 8-9 | Ozono | entero / 10 |
+| 10-11 | Temperatura | entero con signo / 10 |
+| 12-13 | Humedad opcional | entero / 10 |
+
+Si el mensaje tiene el formato anterior de 9 bytes, se usa el decodificador legado del primer intento.

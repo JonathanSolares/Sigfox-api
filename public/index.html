@@ -1,118 +1,273 @@
 <!DOCTYPE html>
 <html lang="es">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dashboard Sigfox</title>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta
+      name="description"
+      content="Panel de monitoreo de calidad del aire para ESIME Zacatenco."
+    />
+    <meta property="og:title" content="ESIME Inteligente" />
+    <meta property="og:type" content="website" />
+    <meta property="twitter:card" content="summary_large_image" />
+    <title>ESIME Inteligente | Calidad del Aire</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Lexend:wght@500;600;700&family=Titillium+Web:wght@400;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="./style.css" />
+    <script src="./config.js"></script>
+  </head>
+  <body>
+    <header class="site-header">
+      <a class="brand" href="#inicio" aria-label="Inicio ESIME Inteligente">
+        <span class="brand-mark">EI</span>
+        <span><strong>ESIME</strong> Inteligente</span>
+      </a>
 
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+      <button class="menu-button" type="button" aria-expanded="false" aria-controls="site-nav">
+        <span></span>
+        <span></span>
+        <span></span>
+      </button>
 
-    <style>
-        body {
-            font-family: Arial;
-            background: #f5f5f5;
-            margin: 20px;
-        }
+      <nav id="site-nav" class="site-nav" aria-label="Navegación principal">
+        <a href="#calidad">Calidad del aire</a>
+        <div class="nav-dropdown">
+          <button class="nav-dropdown-button" type="button" aria-expanded="false">
+            Estaciones
+          </button>
+          <div class="nav-dropdown-menu">
+            <a href="#estaciones" data-station-link="encb-principal">Principal ENCB</a>
+            <a href="#estaciones" data-station-link="encb-secundaria">Secundaria ENCB</a>
+            <a href="#estaciones" data-station-link="encb-interior">Interior ENCB</a>
+            <a href="#estaciones" data-station-link="esime-central">Central ESIME</a>
+            <a href="#estaciones" data-station-link="esime-secundaria">Secundaria ESIME</a>
+          </div>
+        </div>
+        <a href="#reportes">Reportes</a>
+        <a href="#proyecto">Proyecto</a>
+        <a class="nav-cta" href="#contacto">Contacto</a>
+      </nav>
+    </header>
 
-        h1 {
-            text-align: center;
-        }
+    <main id="inicio">
+      <section class="hero" aria-labelledby="hero-title">
+        <div class="hero-overlay"></div>
+        <div class="hero-content">
+          <p class="eyebrow">Proyecto Calidad del Aire</p>
+          <h1 id="hero-title">ESIME Inteligente - ESIME Zacatenco</h1>
+          <p>
+            Sistema de monitoreo ambiental para consultar indicadores de aire,
+            estaciones activas, reportes y alertas dentro del campus.
+          </p>
+          <div class="hero-actions">
+            <a class="button primary" href="#estaciones">Ver estaciones</a>
+            <a class="button secondary" href="#reportes">Descargar reporte</a>
+          </div>
+        </div>
+      </section>
 
-        .cards {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-            gap: 15px;
-            margin-bottom: 30px;
-        }
-
-        .card {
-            background: white;
-            padding: 20px;
-            border-radius: 10px;
-            box-shadow: 0px 2px 5px rgba(0,0,0,0.2);
-            text-align: center;
-        }
-
-        .valor {
-            font-size: 30px;
-            font-weight: bold;
-        }
-
-        canvas {
-            background: white;
-            padding: 20px;
-            border-radius: 10px;
-        }
-    </style>
-</head>
-
-<body>
-
-    <h1>Dashboard Sigfox</h1>
-
-    <div class="cards">
-
-        <div class="card">
-            <h2>CO2</h2>
-            <div class="valor" id="co2">--</div>
+      <section id="calidad" class="section live-section" aria-labelledby="quality-title">
+        <div class="section-heading">
+          <p class="eyebrow">Lectura actual</p>
+          <h2 id="quality-title">Panel de calidad del aire</h2>
+          <p>
+            Lecturas por estación recibidas desde el backend Sigfox del
+            proyecto.
+          </p>
+          <div class="sync-row" aria-live="polite">
+            <span id="sync-status" class="sync-status offline">Usando datos locales</span>
+            <button id="refresh-data" class="small-button" type="button">
+              Actualizar datos
+            </button>
+          </div>
         </div>
 
-        <div class="card">
-            <h2>Temperatura</h2>
-            <div class="valor" id="temp">--</div>
+        <div class="dashboard">
+          <article class="aqi-card">
+            <span class="card-label">Índice general</span>
+            <strong id="aqi-value">42</strong>
+            <span id="aqi-status" class="status good">Buena</span>
+            <p id="aqi-copy">
+              Condiciones adecuadas para actividades normales dentro del campus.
+            </p>
+          </article>
+
+          <div class="metric-grid" aria-label="Indicadores ambientales">
+            <article class="metric-card">
+              <span>PM2.5</span>
+              <strong id="pm25-value">12</strong>
+              <small>µg/m³</small>
+            </article>
+            <article class="metric-card">
+              <span>PM10</span>
+              <strong id="pm10-value">28</strong>
+              <small>µg/m³</small>
+            </article>
+            <article class="metric-card">
+              <span>CO₂</span>
+              <strong id="co2-value">520</strong>
+              <small>ppm</small>
+            </article>
+            <article class="metric-card">
+              <span>Temperatura</span>
+              <strong id="temp-value">23</strong>
+              <small>°C</small>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <section id="estaciones" class="section stations-section" aria-labelledby="stations-title">
+        <div class="section-heading compact">
+          <p class="eyebrow">Estaciones de monitoreo</p>
+          <h2 id="stations-title">Selecciona una estación</h2>
         </div>
 
-        <div class="card">
-            <h2>PM2.5</h2>
-            <div class="valor" id="pm25">--</div>
+        <div class="stations-layout">
+          <aside class="station-list" aria-label="Lista de estaciones">
+            <button class="station-option active" type="button" data-station="encb-principal">
+              <span class="station-dot"></span>
+              <span>
+                <strong>Estación Principal ENCB</strong>
+                <small>Exterior norte</small>
+              </span>
+            </button>
+            <button class="station-option" type="button" data-station="encb-secundaria">
+              <span class="station-dot"></span>
+              <span>
+                <strong>Estación Secundaria ENCB</strong>
+                <small>Acceso peatonal</small>
+              </span>
+            </button>
+            <button class="station-option" type="button" data-station="encb-interior">
+              <span class="station-dot"></span>
+              <span>
+                <strong>Estación Interior ENCB</strong>
+                <small>Laboratorios</small>
+              </span>
+            </button>
+            <button class="station-option" type="button" data-station="esime-central">
+              <span class="station-dot"></span>
+              <span>
+                <strong>Estación Central ESIME</strong>
+                <small>Plaza principal</small>
+              </span>
+            </button>
+            <button class="station-option" type="button" data-station="esime-secundaria">
+              <span class="station-dot warning"></span>
+              <span>
+                <strong>Estación Secundaria ESIME</strong>
+                <small>Zona de talleres</small>
+              </span>
+            </button>
+          </aside>
+
+          <article class="station-detail">
+            <div>
+              <span id="station-state" class="status good">Activa</span>
+              <h3 id="station-name">Estación Principal ENCB</h3>
+              <p id="station-description">
+                Monitorea partículas suspendidas y condiciones ambientales del
+                área exterior norte.
+              </p>
+            </div>
+            <dl class="station-facts">
+              <div>
+                <dt>Actualización</dt>
+                <dd id="station-update">Hace 2 min</dd>
+              </div>
+              <div>
+                <dt>Ubicación</dt>
+                <dd id="station-location">Exterior norte ENCB</dd>
+              </div>
+              <div>
+                <dt>Estado de sensor</dt>
+                <dd id="station-health">Operativo</dd>
+              </div>
+            </dl>
+          </article>
         </div>
+      </section>
 
-    </div>
+      <section class="campus-section" aria-labelledby="campus-title">
+        <div class="campus-copy">
+          <p class="eyebrow">Mapa operativo</p>
+          <h2 id="campus-title">Cobertura dentro del campus</h2>
+          <p>
+            El sistema organiza las lecturas por zona para detectar cambios de
+            calidad del aire, comparar interiores y exteriores, y preparar
+            decisiones de mantenimiento o ventilación.
+          </p>
+        </div>
+        <div class="campus-map" aria-label="Mapa simplificado de estaciones">
+          <span class="map-point point-a">ENCB Principal</span>
+          <span class="map-point point-b">ENCB Interior</span>
+          <span class="map-point point-c">ESIME Central</span>
+          <span class="map-point point-d">ESIME Talleres</span>
+        </div>
+      </section>
 
-    <canvas id="grafica"></canvas>
+      <section id="reportes" class="section reports-section" aria-labelledby="reports-title">
+        <div class="section-heading">
+          <p class="eyebrow">Reportes</p>
+          <h2 id="reports-title">Información lista para compartir</h2>
+          <p>
+            Agrega aquí la descarga real del CSV, PDF o dashboard cuando tengas
+            definida la fuente de datos.
+          </p>
+        </div>
+        <div class="report-grid">
+          <article>
+            <strong>Reporte diario</strong>
+            <p>Promedios por estación, máximos detectados y estado general.</p>
+            <a href="#" aria-disabled="true">Próximamente</a>
+          </article>
+          <article>
+            <strong>Histórico mensual</strong>
+            <p>Comparativa de partículas, temperatura, humedad y CO₂.</p>
+            <a href="#" aria-disabled="true">Próximamente</a>
+          </article>
+          <article>
+            <strong>Alertas ambientales</strong>
+            <p>Eventos fuera de rango y recomendaciones de respuesta.</p>
+            <a href="#" aria-disabled="true">Próximamente</a>
+          </article>
+        </div>
+      </section>
 
-<script>
+      <section id="proyecto" class="section project-section" aria-labelledby="project-title">
+        <div>
+          <p class="eyebrow">Acerca del proyecto</p>
+          <h2 id="project-title">Un campus que entiende su ambiente</h2>
+        </div>
+        <p>
+          ESIME Inteligente busca integrar sensores, visualización de datos y
+          reportes accesibles para que estudiantes, docentes y responsables de
+          mantenimiento consulten el estado ambiental del campus con claridad.
+        </p>
+      </section>
+    </main>
 
-let chart;
+    <footer id="contacto" class="site-footer">
+      <div>
+        <a class="brand footer-brand" href="#inicio">
+          <span class="brand-mark">EI</span>
+          <span><strong>ESIME</strong> Inteligente</span>
+        </a>
+        <p>Monitoreo ambiental para ESIME Zacatenco.</p>
+      </div>
+      <div class="footer-links">
+        <a href="#calidad">Calidad del aire</a>
+        <a href="#estaciones">Estaciones</a>
+        <a href="#reportes">Reportes</a>
+        <a href="mailto:contacto@esime-inteligente.local">Contacto</a>
+      </div>
+    </footer>
 
-async function cargarDatos() {
-
-    const respuesta = await fetch('/datos');
-    const datos = await respuesta.json();
-
-    if(datos.length === 0) return;
-
-    const ultimo = datos[datos.length - 1];
-
-    document.getElementById('co2').innerText = ultimo.co2;
-    document.getElementById('temp').innerText = ultimo.temperatura + " °C";
-    document.getElementById('pm25').innerText = ultimo.pm25;
-
-    const labels = datos.map(d => new Date(d.time * 1000).toLocaleTimeString());
-
-    const co2 = datos.map(d => d.co2);
-
-    if(chart) {
-        chart.destroy();
-    }
-
-    chart = new Chart(document.getElementById('grafica'), {
-        type: 'line',
-        data: {
-            labels: labels,
-            datasets: [{
-                label: 'CO2',
-                data: co2
-            }]
-        }
-    });
-}
-
-cargarDatos();
-
-setInterval(cargarDatos, 10000);
-
-</script>
-
-</body>
+    <script src="./script.js" defer></script>
+  </body>
 </html>
