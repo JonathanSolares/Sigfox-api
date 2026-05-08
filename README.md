@@ -58,12 +58,17 @@ Body recomendado:
   "device": "{device}",
   "time": "{time}",
   "data": "{data}",
-  "seqNumber": "{seqNumber}",
-  "duplicate": "{duplicate}"
+  "seqNumber": "{seqNumber}"
 }
 ```
 
 El endpoint anterior `/sigfox` sigue funcionando para no romper la configuración previa.
+
+Si Sigfox no permite guardar JSON, usa `application/x-www-form-urlencoded` con:
+
+```text
+device={device}&time={time}&data={data}&seqNumber={seqNumber}
+```
 
 ## API para la página
 
