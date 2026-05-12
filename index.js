@@ -304,6 +304,32 @@ function getDateRange(query) {
   return new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
 }
 
+function getReportRange(query) {
+  const now = new Date();
+
+  if (query.period === "day") {
+    return {
+      since: new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString(),
+      dates: [new Date(now.getFullYear(), now.getMonth(), now.getDate())],
+    };
+  }
+
+  if (query.period === "month") {
+    const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
+    const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+    return {
+      since: firstDay.toISOString(),
+      dates: buildDateList(firstDay, lastDay),
+    };
+  }
+
+  const sinceDate = new Date(getDateRange(query));
+  return {
+    since: sinceDate.toISOString(),
+    dates: buildDateList(sinceDate, now),
+  };
+}
+
 function escapeXml(value) {
   return String(value ?? "")
     .replace(/&/g, "&amp;")
@@ -396,57 +422,173 @@ function cellReference(columnIndex, rowIndex) {
   return `${column}${rowIndex}`;
 }
 
-function buildSheetXml(columns, rows) {
-  const headerCells = columns
-    .map((column, index) => {
-      const ref = cellReference(index, 1);
-      return `<c r="${ref}" t="inlineStr"><is><t>${escapeXml(column)}</t></is></c>`;
+function buildDateList(start, end) {
+  const dates = [];
+  const cursor = new Date(start.getFullYear(), start.getMonth(), start.getDate());
+  const last = new Date(end.getFullYear(), end.getMonth(), end.getDate());
+
+  while (cursor <= last) {
+    dates.push(new Date(cursor));
+    cursor.setDate(cursor.getDate() + 1);
+  }
+
+  return dates;
+}
+
+function formatDateKey(value) {
+  const date = new Date(value);
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function formatReportDate(value) {
+  const date = new Date(value);
+  const day = String(date.getDate()).padStart(2, "0");
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const year = date.getFullYear();
+  return `${day}-${month}-${year}`;
+}
+
+function formatReportTime(value) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return [
+    String(date.getHours()).padStart(2, "0"),
+    String(date.getMinutes()).padStart(2, "0"),
+    String(date.getSeconds()).padStart(2, "0"),
+  ].join(":");
+}
+
+function getReadingTimestamp(row) {
+  return row.receivedAt || row.time || "";
+}
+
+function sheetName(value) {
+  return String(value || "Hoja").replace(/[\\/?*[\]:]/g, " ").slice(0, 31);
+}
+
+function buildSparseSheetXml(rows, merges = []) {
+  const bodyRows = rows
+    .map((row) => {
+      const cells = row.cells
+        .map((cell) => {
+          const ref = cellReference(cell.column, row.index);
+          if (typeof cell.value === "number" && Number.isFinite(cell.value)) {
+            return `<c r="${ref}"><v>${cell.value}</v></c>`;
+          }
+          return `<c r="${ref}" t="inlineStr"><is><t>${escapeXml(cell.value)}</t></is></c>`;
+        })
+        .join("");
+      return `<row r="${row.index}">${cells}</row>`;
     })
     .join("");
 
-  const bodyRows = rows
-    .map((row, rowIndex) => {
-      const excelRow = rowIndex + 2;
-      const cells = columns
-        .map((column, columnIndex) => {
-          const value = row[column];
-          const ref = cellReference(columnIndex, excelRow);
-          if (typeof value === "number" && Number.isFinite(value)) {
-            return `<c r="${ref}"><v>${value}</v></c>`;
-          }
-          return `<c r="${ref}" t="inlineStr"><is><t>${escapeXml(value)}</t></is></c>`;
-        })
-        .join("");
-      return `<row r="${excelRow}">${cells}</row>`;
-    })
-    .join("");
+  const mergeXml = merges.length
+    ? `<mergeCells count="${merges.length}">${merges
+        .map((merge) => `<mergeCell ref="${merge}"/>`)
+        .join("")}</mergeCells>`
+    : "";
 
   return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
   <sheetData>
-    <row r="1">${headerCells}</row>
     ${bodyRows}
   </sheetData>
+  ${mergeXml}
 </worksheet>`;
 }
 
-function sendExcel(res, filename, rows) {
-  const columns = [
-    "id",
-    "stationId",
-    "device",
-    "nox",
-    "ozono",
-    "co2",
-    "co",
-    "so2",
-    "pm25",
-    "pm10",
-    "temperatura",
-    "aqi",
-    "time",
-    "receivedAt",
-  ];
+const reportMetrics = [
+  { field: "nox", label: "NOx" },
+  { field: "ozono", label: "Ozono" },
+  { field: "co2", label: "CO2" },
+  { field: "co", label: "CO" },
+  { field: "so2", label: "SO2" },
+  { field: "pm25", label: "PM2.5" },
+  { field: "pm10", label: "PM10" },
+];
+
+function buildMonitoringSheet(rows, dates) {
+  const rowsByDay = new Map();
+
+  rows.forEach((row) => {
+    const timestamp = getReadingTimestamp(row);
+    const date = new Date(timestamp);
+    if (Number.isNaN(date.getTime())) return;
+
+    const key = formatDateKey(date);
+    if (!rowsByDay.has(key)) rowsByDay.set(key, []);
+    rowsByDay.get(key).push(row);
+  });
+
+  rowsByDay.forEach((dayRows) => {
+    dayRows.sort((first, second) => new Date(getReadingTimestamp(first)) - new Date(getReadingTimestamp(second)));
+  });
+
+  const sheetRows = new Map();
+  const merges = [];
+  const ensureRow = (index) => {
+    if (!sheetRows.has(index)) sheetRows.set(index, { index, cells: [] });
+    return sheetRows.get(index);
+  };
+
+  dates.forEach((date, dayIndex) => {
+    const startColumn = 1 + dayIndex * 9;
+    const dateRow = ensureRow(2);
+    dateRow.cells.push({ column: startColumn, value: formatReportDate(date) });
+    merges.push(`${cellReference(startColumn, 2)}:${cellReference(startColumn + reportMetrics.length, 2)}`);
+
+    const headerRow = ensureRow(6);
+    headerRow.cells.push({ column: startColumn, value: "HORA" });
+    reportMetrics.forEach((metric, metricIndex) => {
+      headerRow.cells.push({ column: startColumn + metricIndex + 1, value: metric.label });
+    });
+
+    const dayRows = rowsByDay.get(formatDateKey(date)) || [];
+    dayRows.forEach((reading, readingIndex) => {
+      const bodyRow = ensureRow(7 + readingIndex);
+      bodyRow.cells.push({ column: startColumn, value: formatReportTime(getReadingTimestamp(reading)) });
+      reportMetrics.forEach((metric, metricIndex) => {
+        const value = normalizeNumber(reading[metric.field]);
+        bodyRow.cells.push({
+          column: startColumn + metricIndex + 1,
+          value: value ?? "",
+        });
+      });
+    });
+  });
+
+  return buildSparseSheetXml([...sheetRows.values()].sort((a, b) => a.index - b.index), merges);
+}
+
+function sendMonitoringExcel(res, filename, sheetDefinitions, dates) {
+  const worksheetFiles = sheetDefinitions.map((sheet, index) => ({
+    name: `xl/worksheets/sheet${index + 1}.xml`,
+    content: buildMonitoringSheet(sheet.rows, dates),
+  }));
+
+  const sheetOverrides = worksheetFiles
+    .map(
+      (_sheet, index) =>
+        `<Override PartName="/xl/worksheets/sheet${index + 1}.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>`
+    )
+    .join("");
+
+  const workbookSheets = sheetDefinitions
+    .map(
+      (sheet, index) =>
+        `<sheet name="${escapeXml(sheetName(sheet.name))}" sheetId="${index + 1}" r:id="rId${index + 1}"/>`
+    )
+    .join("");
+
+  const workbookRelationships = sheetDefinitions
+    .map(
+      (_sheet, index) =>
+        `<Relationship Id="rId${index + 1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet${index + 1}.xml"/>`
+    )
+    .join("");
 
   const files = [
     {
@@ -456,7 +598,7 @@ function sendExcel(res, filename, rows) {
   <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
   <Default Extension="xml" ContentType="application/xml"/>
   <Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>
-  <Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>
+  ${sheetOverrides}
 </Types>`,
     },
     {
@@ -470,20 +612,17 @@ function sendExcel(res, filename, rows) {
       name: "xl/workbook.xml",
       content: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
-  <sheets><sheet name="Lecturas" sheetId="1" r:id="rId1"/></sheets>
+  <sheets>${workbookSheets}</sheets>
 </workbook>`,
     },
     {
       name: "xl/_rels/workbook.xml.rels",
       content: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
-  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/>
+  ${workbookRelationships}
 </Relationships>`,
     },
-    {
-      name: "xl/worksheets/sheet1.xml",
-      content: buildSheetXml(columns, rows),
-    },
+    ...worksheetFiles,
   ];
 
   res.header("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
@@ -572,35 +711,46 @@ app.get("/api/stations/:stationId/readings", (req, res) => {
 });
 
 app.get(["/api/stations/:stationId/export.xlsx", "/api/stations/:stationId/export.xls"], (req, res) => {
-  const since = getDateRange({ ...req.query, days: req.query.days || 30 });
+  const range = getReportRange({ ...req.query, days: req.query.days || 30 });
+  const station = stations.find((item) => item.id === req.params.stationId) || {
+    id: req.params.stationId,
+    name: req.params.stationId,
+  };
 
   db.all(
     "SELECT * FROM sensores WHERE stationId = ? AND COALESCE(receivedAt, time) >= ? ORDER BY id ASC",
-    [req.params.stationId, since],
+    [req.params.stationId, range.since],
     (err, rows) => {
       if (err) {
         res.status(500).json({ ok: false, error: err.message });
         return;
       }
 
-      sendExcel(res, `${req.params.stationId}-ultimos-30-dias.xlsx`, rows);
+      sendMonitoringExcel(res, `${req.params.stationId}-reporte.xlsx`, [{ name: station.name, rows }], range.dates);
     }
   );
 });
 
 app.get(["/api/export.xlsx", "/api/export.xls"], (req, res) => {
-  const since = getDateRange({ ...req.query, days: req.query.days || 30 });
+  const range = getReportRange({ ...req.query, days: req.query.days || 30 });
 
   db.all(
     "SELECT * FROM sensores WHERE COALESCE(receivedAt, time) >= ? ORDER BY stationId ASC, id ASC",
-    [since],
+    [range.since],
     (err, rows) => {
       if (err) {
         res.status(500).json({ ok: false, error: err.message });
         return;
       }
 
-      sendExcel(res, "esime-calidad-aire-ultimos-30-dias.xlsx", rows);
+      const sheetDefinitions = stations
+        .filter((station) => station.id.startsWith("encb-"))
+        .map((station) => ({
+          name: station.name,
+          rows: rows.filter((row) => row.stationId === station.id),
+        }));
+
+      sendMonitoringExcel(res, "esime-calidad-aire-reporte.xlsx", sheetDefinitions, range.dates);
     }
   );
 });

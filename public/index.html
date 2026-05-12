@@ -11,6 +11,7 @@
     <meta property="og:type" content="website" />
     <meta property="twitter:card" content="summary_large_image" />
     <title>ESIME Inteligente | Calidad del Aire</title>
+    <link rel="icon" type="image/svg+xml" href="./favicon.svg" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
@@ -64,7 +65,7 @@
           </p>
           <div class="hero-actions">
             <a class="button primary" href="#estaciones">Ver estaciones</a>
-            <a class="button secondary" href="/api/export.xlsx?days=30" download>Descargar Excel</a>
+            <a class="button secondary" href="/api/export.xlsx?period=month" download>Descargar Excel</a>
           </div>
         </div>
       </section>
@@ -167,8 +168,8 @@
             <a id="download-station" class="small-button" href="/api/stations/encb-principal/export.xlsx?days=30" download>
               Excel de esta estación
             </a>
-            <a id="download-all" class="small-button ghost" href="/api/export.xlsx?days=30" download>
-              Excel últimos 30 días
+            <a id="download-all" class="small-button ghost" href="/api/export.xlsx?period=month" download>
+              Excel mensual
             </a>
           </div>
         </div>
@@ -215,18 +216,18 @@
         <div class="report-grid">
           <article>
             <strong>Reporte diario</strong>
-            <p>Lecturas de todas las estaciones durante las últimas 24 horas.</p>
-            <a id="daily-report-link" href="/api/export.xlsx?days=1" download>Descargar Excel</a>
+            <p>Lecturas de todas las estaciones durante el día actual.</p>
+            <a id="daily-report-link" href="/api/export.xlsx?period=day" download>Descargar Excel</a>
           </article>
           <article>
             <strong>Histórico mensual</strong>
-            <p>Registros de contaminantes y ambiente de los últimos 30 días.</p>
-            <a id="monthly-report-link" href="/api/export.xlsx?days=30" download>Descargar Excel</a>
+            <p>Registros de contaminantes y ambiente del mes actual.</p>
+            <a id="monthly-report-link" href="/api/export.xlsx?period=month" download>Descargar Excel</a>
           </article>
           <article>
             <strong>Alertas ambientales</strong>
             <p>Descarga el histórico para revisar valores fuera de rango.</p>
-            <a id="alerts-report-link" href="/api/export.xlsx?days=30" download>Descargar registros</a>
+            <a id="alerts-report-link" href="/api/export.xlsx?period=month" download>Descargar registros</a>
           </article>
         </div>
       </section>

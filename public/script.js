@@ -48,14 +48,14 @@ const apiBase =
       : "";
 
 const metrics = [
-  { field: "pm25", label: "PM2.5", color: "#0f7b52", element: "pm25-value" },
-  { field: "pm10", label: "PM10", color: "#2978a0", element: "pm10-value" },
-  { field: "co2", label: "CO2", color: "#805100", element: "co2-value" },
-  { field: "nox", label: "NOx", color: "#7a4bc2", element: "nox-value" },
-  { field: "ozono", label: "Ozono", color: "#2d8f8a", element: "ozono-value" },
-  { field: "co", label: "CO", color: "#b84d2a", element: "co-value" },
-  { field: "so2", label: "SO2", color: "#64748b", element: "so2-value" },
-  { field: "temperatura", label: "Temperatura", color: "#d97706", element: "temp-value" },
+  { field: "pm25", label: "PM2.5", unit: "ug/m3", color: "#0f7b52", element: "pm25-value" },
+  { field: "pm10", label: "PM10", unit: "ug/m3", color: "#2978a0", element: "pm10-value" },
+  { field: "co2", label: "CO2", unit: "ppm", color: "#805100", element: "co2-value" },
+  { field: "nox", label: "NOx", unit: "ppb", color: "#7a4bc2", element: "nox-value" },
+  { field: "ozono", label: "Ozono", unit: "ppb", color: "#2d8f8a", element: "ozono-value" },
+  { field: "co", label: "CO", unit: "ppm", color: "#b84d2a", element: "co-value" },
+  { field: "so2", label: "SO2", unit: "ppb", color: "#64748b", element: "so2-value" },
+  { field: "temperatura", label: "Temperatura", unit: "C", color: "#d97706", element: "temp-value" },
 ];
 
 const thresholds = {
@@ -70,6 +70,7 @@ const thresholds = {
 
 let stations = { ...stationDefinitions };
 let selectedStationId = "encb-principal";
+const chartStates = new WeakMap();
 
 const nav = document.querySelector(".site-nav");
 const menuButton = document.querySelector(".menu-button");
@@ -216,17 +217,68 @@ function getReadingTime(reading) {
   return new Date(reading.receivedAt || reading.time || Date.now());
 }
 
-function drawChart(canvas, readings, field, color) {
+function formatChartTime(date) {
+  return new Intl.DateTimeFormat("es-MX", {
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  }).format(date);
+}
+
+function getCanvasPointer(canvas, event) {
+  const rect = canvas.getBoundingClientRect();
+  const scaleX = canvas.width / rect.width;
+  const scaleY = canvas.height / rect.height;
+  return {
+    x: (event.clientX - rect.left) * scaleX,
+    y: (event.clientY - rect.top) * scaleY,
+  };
+}
+
+function findNearestPoint(points, pointer) {
+  let nearest = null;
+  let nearestDistance = Infinity;
+
+  points.forEach((point) => {
+    const distance = Math.hypot(point.x - pointer.x, point.y - pointer.y);
+    if (distance < nearestDistance) {
+      nearest = point;
+      nearestDistance = distance;
+    }
+  });
+
+  return nearestDistance <= 14 ? nearest : null;
+}
+
+function drawTooltip(context, canvas, point, metric) {
+  const concentration = `${formatNumber(point.value)} ${metric.unit}`;
+  const time = `Hora: ${formatChartTime(point.time)}`;
+  const value = `${metric.label}: ${concentration}`;
+  const padding = 10;
+  const lineHeight = 18;
+  const width = Math.max(context.measureText(time).width, context.measureText(value).width) + padding * 2;
+  const height = padding * 2 + lineHeight * 2;
+  const x = Math.min(canvas.width - width - 8, Math.max(8, point.x + 12));
+  const y = Math.max(8, point.y - height - 14);
+
+  context.fillStyle = "rgba(16, 35, 29, 0.94)";
+  context.fillRect(x, y, width, height);
+  context.fillStyle = "#ffffff";
+  context.font = "700 14px Titillium Web";
+  context.fillText(time, x + padding, y + padding + 13);
+  context.font = "14px Titillium Web";
+  context.fillText(value, x + padding, y + padding + 13 + lineHeight);
+}
+
+function renderChart(canvas, activePoint = null) {
+  const state = chartStates.get(canvas);
+  if (!state) return;
+
   const context = canvas.getContext("2d");
   const width = canvas.width;
   const height = canvas.height;
   const padding = 34;
-  const values = readings
-    .map((reading) => ({
-      value: getReadingValue(reading, field),
-      time: getReadingTime(reading),
-    }))
-    .filter((point) => !Number.isNaN(point.time.getTime()));
+  const { values, metric } = state;
 
   context.clearRect(0, 0, width, height);
   context.fillStyle = "#fbfff9";
@@ -249,8 +301,8 @@ function drawChart(canvas, readings, field, color) {
     return;
   }
 
-  const minTime = Date.now() - 24 * 60 * 60 * 1000;
-  const maxTime = Date.now();
+  const minTime = state.minTime;
+  const maxTime = state.maxTime;
   const maxValue = Math.max(...values.map((point) => point.value), 1);
   const minValue = Math.min(...values.map((point) => point.value), 0);
   const range = Math.max(maxValue - minValue, 1);
@@ -259,29 +311,83 @@ function drawChart(canvas, readings, field, color) {
   const toY = (value) =>
     height - padding - ((value - minValue) / range) * (height - padding * 2);
 
-  context.strokeStyle = color;
+  const plottedPoints = values.map((point) => ({
+    ...point,
+    x: Math.max(padding, Math.min(width - padding, toX(point.time))),
+    y: toY(point.value),
+  }));
+
+  context.strokeStyle = metric.color;
   context.lineWidth = 3;
   context.beginPath();
-  values.forEach((point, index) => {
-    const x = Math.max(padding, Math.min(width - padding, toX(point.time)));
-    const y = toY(point.value);
-    if (index === 0) context.moveTo(x, y);
-    else context.lineTo(x, y);
+  plottedPoints.forEach((point, index) => {
+    if (index === 0) context.moveTo(point.x, point.y);
+    else context.lineTo(point.x, point.y);
   });
   context.stroke();
 
-  context.fillStyle = color;
-  values.forEach((point) => {
-    const x = Math.max(padding, Math.min(width - padding, toX(point.time)));
+  context.fillStyle = metric.color;
+  plottedPoints.forEach((point) => {
+    const isActive =
+      activePoint &&
+      point.time.getTime() === activePoint.time.getTime() &&
+      point.value === activePoint.value;
     context.beginPath();
-    context.arc(x, toY(point.value), 4, 0, Math.PI * 2);
+    context.arc(point.x, point.y, isActive ? 6 : 4, 0, Math.PI * 2);
     context.fill();
   });
+
+  if (activePoint) {
+    context.strokeStyle = "#10231d";
+    context.lineWidth = 2;
+    context.beginPath();
+    context.arc(activePoint.x, activePoint.y, 8, 0, Math.PI * 2);
+    context.stroke();
+    drawTooltip(context, canvas, activePoint, metric);
+  }
 
   context.fillStyle = "#5a6f67";
   context.font = "15px Titillium Web";
   context.fillText(formatNumber(maxValue), 6, padding + 5);
   context.fillText(formatNumber(minValue), 6, height - padding);
+
+  state.points = plottedPoints;
+}
+
+function bindChartPointer(canvas) {
+  if (canvas.dataset.tooltipBound === "true") return;
+
+  canvas.dataset.tooltipBound = "true";
+  canvas.addEventListener("mousemove", (event) => {
+    const state = chartStates.get(canvas);
+    const pointer = getCanvasPointer(canvas, event);
+    const nearest = state?.points ? findNearestPoint(state.points, pointer) : null;
+    canvas.style.cursor = nearest ? "pointer" : "default";
+    renderChart(canvas, nearest);
+  });
+  canvas.addEventListener("mouseleave", () => {
+    canvas.style.cursor = "default";
+    renderChart(canvas);
+  });
+}
+
+function drawChart(canvas, readings, metric) {
+  const values = readings
+    .map((reading) => ({
+      value: getReadingValue(reading, metric.field),
+      time: getReadingTime(reading),
+    }))
+    .filter((point) => !Number.isNaN(point.time.getTime()));
+
+  chartStates.set(canvas, {
+    metric,
+    values,
+    points: [],
+    minTime: Date.now() - 24 * 60 * 60 * 1000,
+    maxTime: Date.now(),
+  });
+  bindChartPointer(canvas);
+  renderChart(canvas);
 }
 
 async function loadStationHistory() {
@@ -296,7 +402,7 @@ async function loadStationHistory() {
     const readings = payload.readings || [];
     metrics.forEach((metric) => {
       const canvas = document.getElementById(`chart-${metric.field === "temperatura" ? "temp" : metric.field}`);
-      if (canvas) drawChart(canvas, readings, metric.field, metric.color);
+      if (canvas) drawChart(canvas, readings, metric);
     });
     setChartStatus(
       readings.length
@@ -308,17 +414,17 @@ async function loadStationHistory() {
     setChartStatus("No se pudo cargar el histórico", "offline");
     metrics.forEach((metric) => {
       const canvas = document.getElementById(`chart-${metric.field === "temperatura" ? "temp" : metric.field}`);
-      if (canvas) drawChart(canvas, [], metric.field, metric.color);
+      if (canvas) drawChart(canvas, [], metric);
     });
   }
 }
 
 function updateDownloadLinks() {
   downloadStation.href = `${apiBase}/api/stations/${selectedStationId}/export.xlsx?days=30`;
-  downloadAll.href = `${apiBase}/api/export.xlsx?days=30`;
-  dailyReportLink.href = `${apiBase}/api/export.xlsx?days=1`;
-  monthlyReportLink.href = `${apiBase}/api/export.xlsx?days=30`;
-  alertsReportLink.href = `${apiBase}/api/export.xlsx?days=30`;
+  downloadAll.href = `${apiBase}/api/export.xlsx?period=month`;
+  dailyReportLink.href = `${apiBase}/api/export.xlsx?period=day`;
+  monthlyReportLink.href = `${apiBase}/api/export.xlsx?period=month`;
+  alertsReportLink.href = `${apiBase}/api/export.xlsx?period=month`;
 }
 
 async function loadStations() {
