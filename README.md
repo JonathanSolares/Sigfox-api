@@ -18,6 +18,7 @@ Configura en DigitalOcean:
 
 ```text
 SIGFOX_CALLBACK_TOKEN=un-token-secreto
+ADMIN_RESET_TOKEN=otro-token-secreto-para-borrar-datos
 CORS_ORIGIN=*
 DEVICE_ENCB_PRINCIPAL=id-real-sigfox
 DEVICE_ENCB_SECUNDARIA=id-real-sigfox
@@ -90,6 +91,20 @@ Si frontend y backend están en el mismo dominio, deja `public/config.js` con:
 ```js
 window.ESIME_API_BASE = "";
 ```
+
+## Borrar datos de prueba
+
+Para dejar las graficas y los Excel en cero, configura `ADMIN_RESET_TOKEN` en
+DigitalOcean y vuelve a desplegar la app. Si no configuras esa variable, el
+endpoint usara `SIGFOX_CALLBACK_TOKEN`. Luego ejecuta una peticion `POST`:
+
+```bash
+curl -X POST "https://lionfish-app-lqd2h.ondigitalocean.app/api/admin/reset-data?token=otro-token-secreto-para-borrar-datos"
+```
+
+Esto borra todas las filas de `sensores`. Los nuevos callbacks de Sigfox se
+empezaran a guardar desde cero y los Excel se generaran solo con esos datos
+nuevos.
 
 ## Payload
 

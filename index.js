@@ -6,6 +6,7 @@ const db = new sqlite3.Database("data.db");
 
 const PORT = process.env.PORT || 3000;
 const CALLBACK_TOKEN = process.env.SIGFOX_CALLBACK_TOKEN || "";
+const ADMIN_RESET_TOKEN = process.env.ADMIN_RESET_TOKEN || CALLBACK_TOKEN;
 const CORS_ORIGIN = process.env.CORS_ORIGIN || "*";
 const RETENTION_DAYS = Number(process.env.RETENTION_DAYS || 30);
 
@@ -632,6 +633,33 @@ function sendMonitoringExcel(res, filename, sheetDefinitions, dates) {
 
 app.get("/api/health", (req, res) => {
   res.json({ ok: true });
+});
+
+app.post("/api/admin/reset-data", (req, res) => {
+  if (!ADMIN_RESET_TOKEN || req.query.token !== ADMIN_RESET_TOKEN) {
+    res.status(401).json({ ok: false, error: "Invalid admin token" });
+    return;
+  }
+
+  db.serialize(() => {
+    db.run("DELETE FROM sensores", function onDelete(deleteErr) {
+      if (deleteErr) {
+        res.status(500).json({ ok: false, error: deleteErr.message });
+        return;
+      }
+
+      const deletedRows = this.changes;
+
+      db.run("DELETE FROM sqlite_sequence WHERE name = 'sensores'", (sequenceErr) => {
+        if (sequenceErr) {
+          res.status(500).json({ ok: false, error: sequenceErr.message });
+          return;
+        }
+
+        res.json({ ok: true, deleted: deletedRows });
+      });
+    });
+  });
 });
 
 app.post(["/sigfox", "/api/sigfox/callback"], (req, res) => {
